@@ -1,0 +1,10 @@
+venv/
+idea/
+.idea/
+config.toml
+*.log
+*.log.*
+*.pickle
+*.png
+*.jpg
+!*.default.jpg
