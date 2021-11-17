@@ -11,3 +11,4 @@ class Emoji:
     WARN = "⚠️"
     SHH = "🤫"
     LIST = "📜"
+    SAD = "😔"

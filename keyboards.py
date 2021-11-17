@@ -23,7 +23,7 @@ def secret_santa(chat_id: int, bot_username: str, participants_count: int = 0):
     return InlineKeyboardMarkup(keyboard)
 
 
-def leave_private(chat_id: int):
+def joined_message(chat_id: int):
     return InlineKeyboardMarkup(
         [[
             InlineKeyboardButton(f"{Emoji.FREEZE} leave", callback_data=f"private:leave:{chat_id}"),

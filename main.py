@@ -157,10 +157,6 @@ def get_secret_santa():
 
             result_santa = func(update, context, santa, *args, **kwargs)
             if result_santa and isinstance(result_santa, SecretSanta):
-                # print(result_santa)
-                # time.sleep(5)
-                # result_santa.add(update.effective_user)
-                # print(result_santa)
                 context.chat_data[ACTIVE_SECRET_SANTA_KEY] = result_santa.dict()
 
         return wrapped
@@ -197,7 +193,7 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
         text = base_text.format(
             santa=Emoji.SANTA,
             participants="\n".join(participants_list),
-            creator=santa.creator_name,
+            creator=santa.creator_name_escaped,
         )
         reply_markup = keyboards.revoke()
     else:
@@ -208,13 +204,13 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
             min_participants_text = f". Other <b>{santa.get_missing_count()}</b> people are needed to start it"
 
         base_text = '{santa} Oh-oh! A new Secret Santa!\nParticipants list:\n\n{participants}\n\n' \
-                    'To join, use the "<b>join</b>" button below, then <b>start me</b>.\n' \
+                    'To join, use the "<b>join</b>" button below and then tap on "<b>start </b>".\n' \
                     'Only {creator} can start this Secret Santa{min_participants}'
 
         text = base_text.format(
             santa=Emoji.SANTA,
             participants="\n".join(participants_list),
-            creator=santa.creator_name,
+            creator=santa.creator_name_escaped,
             min_participants=min_participants_text
         )
 
@@ -315,7 +311,7 @@ def on_join_command(update: Update, context: CallbackContext):
     else:
         wait_for_start_text = f"Now wait for {santa.creator_name_escaped} to start it"
 
-    reply_markup = keyboards.leave_private(santa_chat_id)
+    reply_markup = keyboards.joined_message(santa_chat_id)
     sent_message = update.message.reply_html(
         f"{Emoji.TREE} You joined {santa.chat_title_escaped}'s {santa.inline_link('Secret Santa')}!\n"
         f"{wait_for_start_text}. You will receive your match here",
@@ -371,7 +367,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         )
         return
 
-    sent_message = update.effective_message.reply_html('{} <i>Matching users...</i>'.format(Emoji.HOURGLASS))
+    sent_message = update.effective_message.reply_html(f'{Emoji.HOURGLASS} <i>Matching users...</i>')
 
     blocked_by = []
     for user_id, user_data in santa.participants.items():
@@ -380,14 +376,15 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         except (TelegramError, BadRequest) as e:
             if "bot was blocked by the user" in str(e).lower():
                 logger.debug("%d blocked the bot", user_id)
-                blocked_by.append(utilities.mention_escaped_by_id(user_id, user_data["name"]))
             else:
                 # what to do?
                 logger.debug("can't send chat action to %d: %s", user_id, str(e))
 
+            blocked_by.append(utilities.mention_escaped_by_id(user_id, user_data["name"]))
+
     if blocked_by:
         users_list = ", ".join(blocked_by)
-        text = f"I can't start the Secret Santa because some users ({users_list}) have blocked me. " \
+        text = f"I can't start the Secret Santa because some users ({users_list}) have blocked me {Emoji.SAD}\n" \
                f"They need to unblock me so I can send them their match"
         sent_message.edit_text(text)
         return
@@ -398,13 +395,12 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         match_mention = utilities.mention_escaped_by_id(match_id, match_name)
 
         text = f"{Emoji.SANTA}{Emoji.PRESENT} Your <a href=\"{santa.link()}\">Secret Santa</a> match is " \
-               f"{match_mention}! Do not reveal this name to anyone :)"
+               f"{match_mention}!"
 
         match_message = context.bot.send_message(receiver_id, text)
         santa.set_user_match_message_id(receiver_id, match_message.message_id)
 
-    text = f"Everyone has received their match in their <b>private chats</b>! {santa.creator_name_escaped} " \
-           f"still has some time to revoke this Secret Santa's matches"
+    text = f"Everyone has received their match in their <b>private chats</b>!"
     sent_message.edit_text(text)
 
     santa.started = True
@@ -444,7 +440,7 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
 
     couldnt_notify = []
     text = f"{Emoji.WARN} <a href=\"{santa.link()}\">This Secret Santa</a> has been canceled by its creator, " \
-           f"<b>please ignore this match</b> as it is no longer valid"
+           f"<b>please ignore this match</b>, as it is no longer valid"
     for user_id, user_data in santa.participants.items():
         try:
             context.bot.send_message(user_id, text, reply_to_message_id=user_data["match_message_id"])
