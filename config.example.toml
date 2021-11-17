@@ -6,3 +6,4 @@ exit_unknown_groups = true # exit groups if not added by an user id in 'admins'
 
 [santa]
 min_participants = 4
+timeout = 72 # hours

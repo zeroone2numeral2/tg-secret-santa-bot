@@ -6,6 +6,7 @@ import logging.config
 import os
 import random
 import re
+import threading
 import time
 from functools import wraps
 from pathlib import Path
@@ -154,6 +155,17 @@ def gen_santa_link(santa: SecretSanta):
     return link
 
 
+def gen_participants_list(participants: dict):
+    participants_list = []
+    i = 1
+    for participant_id, participant in participants.items():
+        string = f'<b>{i}</b>. {utilities.mention_escaped_by_id(participant_id, participant["name"])}'
+        participants_list.append(string)
+        i += 1
+
+    return participants_list
+
+
 def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
     participants_count = santa.get_participants_count()
     if not participants_count:
@@ -164,17 +176,12 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
             participants_count=participants_count
         )
     elif santa.started:
-        participants_list = []
-        i = 1
-        for participant_id, participant in santa.participants.items():
-            string = f'<b>{i}</b>. {utilities.mention_escaped_by_id(participant_id, participant["name"])}'
-            participants_list.append(string)
-            i += 1
+        participants_list = gen_participants_list(santa.participants)
 
         base_text = '{santa} This Secret Santa has been started and everyone received their match!\n' \
                     'Participants list:\n\n' \
                     '{participants}\n\n' \
-                    '{creator} still has some time to revoke the matches'
+                    '{creator} still has some time to cancel it'
         text = base_text.format(
             santa=Emoji.SANTA,
             participants="\n".join(participants_list),
@@ -182,12 +189,7 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
         )
         reply_markup = keyboards.revoke()
     else:
-        participants_list = []
-        i = 1
-        for participant_id, participant in santa.participants.items():
-            string = f'<b>{i}</b>. {utilities.mention_escaped_by_id(participant_id, participant["name"])}'
-            participants_list.append(string)
-            i += 1
+        participants_list = gen_participants_list(santa.participants)
 
         min_participants_text = ""
         if santa.get_missing_count():
@@ -196,6 +198,7 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
         base_text = '{santa} Oh-oh! A new Secret Santa!\nParticipants list:\n\n{participants}\n\n' \
                     'Use the "<b>join</b>" button below to join!\n' \
                     'Only {creator} can start this Secret Santa{min_participants}'
+
         text = base_text.format(
             santa=Emoji.SANTA,
             participants="\n".join(participants_list),
@@ -529,20 +532,40 @@ def on_new_group_chat(update: Update, _):
         return
 
 
-def cleanup_and_ban(context: CallbackContext):
+def secret_santa_expired(context:CallbackContext, santa: SecretSanta):
+    text = f"<i>This Secret Santa expired ({config.santa.timeout} hours has passed from its creation)</i>"
+    try:
+        edited_message = context.bot.edit_message_text(
+            chat_id=santa.chat_id,
+            message_id=santa.santa_message_id,
+            text=text,
+            reply_markup=None
+        )
+    except (BadRequest, TelegramError) as e:
+        logger.error("exception while closing secret santa message (%d, %d): %s", santa.chat_id, santa.santa_message_id, str(e))
+        return
+
+    return edited_message
+
+
+def cleanup(context: CallbackContext):
+    logger.debug("cleanup job...")
+
     for chat_id, chat_data in context.dispatcher.chat_data.items():
-        user_id_to_pop = []
-        for user_id, user_data in chat_data.items():
-            if "captcha" not in user_data:
-                continue
+        if ACTIVE_SECRET_SANTA_KEY not in chat_data:
+            continue
 
-            now = utilities.now_utc()
+        santa = SecretSanta.from_dict(chat_data[ACTIVE_SECRET_SANTA_KEY])
 
-        if user_id_to_pop:
-            logger.debug("popping %d users from %d", len(user_id_to_pop), chat_id)
-            for user_id in user_id_to_pop:
-                logger.debug("popping %d", user_id)
-                chat_data.pop(user_id, None)
+        now = utilities.now_utc()
+        diff_seconds = (now - santa.created_on).total_seconds()
+        if diff_seconds <= config.santa.timeout * 60 * 60:
+            continue
+
+        secret_santa_expired(context, santa)
+
+        logger.debug("popping secret santa from chat %d", chat_id)
+        chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
 
 
 def main():
@@ -551,7 +574,7 @@ def main():
     new_group_filter = NewGroup()
     dispatcher.add_handler(MessageHandler(new_group_filter, on_new_group_chat))
 
-    dispatcher.add_handler(CommandHandler(["new"], on_new_secret_santa_command, filters=Filters.chat_type.supergroup))
+    dispatcher.add_handler(CommandHandler(["new", "newsanta", "santa"], on_new_secret_santa_command, filters=Filters.chat_type.supergroup))
     dispatcher.add_handler(CommandHandler(["cancel"], on_cancel_command, filters=Filters.chat_type.supergroup))
     dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_command))
 
@@ -562,7 +585,7 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_private, pattern=r'^private:leave:(-\d+)$'))
     dispatcher.add_handler(CallbackQueryHandler(on_update_name_button_private, pattern=r'^private:updatename:(-\d+)$'))
 
-    updater.job_queue.run_repeating(cleanup_and_ban, interval=60, first=60)
+    updater.job_queue.run_repeating(cleanup, interval=60*30, first=10)
 
     updater.bot.set_my_commands([])  # make sure the bot doesn't have any command set...
     updater.bot.set_my_commands(  # ...then set the scope for private chats
@@ -570,7 +593,7 @@ def main():
         scope=BotCommandScopeAllPrivateChats()
     )
     updater.bot.set_my_commands(  # ...then set the scope for group administrators
-        [BotCommand("match", "create the Secret Santa's pairs")],
+        [BotCommand("newsanta", "create the Secret Santa's pairs")],
         scope=BotCommandScopeAllChatAdministrators()
     )
 
