@@ -7,4 +7,5 @@ log_chat = 0
 
 [santa]
 min_participants = 4
+max_participants = 30 # 0 for unlimited
 timeout = 72

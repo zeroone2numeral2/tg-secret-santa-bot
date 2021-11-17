@@ -304,6 +304,12 @@ def on_join_command(update: Update, context: CallbackContext):
     if not santa:
         raise ValueError(f"user tried to join, but no secret santa is active in {santa_chat_id}")
 
+    if config.santa.max_participants and santa.get_participants_count() >= config.santa.max_participants:
+        text = f"I'm sorry, unfortunately {santa.inline_link('this Secret Santa')} has already reached the " \
+               f"max number of participants {Emoji.SAD}"
+        update.message.reply_html(text)
+        return
+
     santa.add(update.effective_user)
     context.dispatcher.chat_data[santa_chat_id][ACTIVE_SECRET_SANTA_KEY] = santa.dict()
 
