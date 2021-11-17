@@ -513,14 +513,15 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
     name = update.effective_user.first_name
     santa.set_user_name(update.effective_user, name)
 
-    update.callback_query.answer(f"Your name has been updated to: {name}\nThis option allows you to change your "
-                                 f"Telegram name and update it the list (in case there are participants with a "
-                                 f"similar name)", show_alert=True)
+    update.callback_query.answer(f"Your name has been updated to: {name}\n\nThis option allows you to change your "
+                                 f"Telegram name and update it in the list (helpful if there are participants with "
+                                 f"similar names)", show_alert=True)
 
     update_secret_santa_message(context, santa)
 
 
 @fail_with_message(answer_to_message=False)
+@private_chat_button()
 def on_leave_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("leave button in private: %d", update.effective_chat.id)
 
