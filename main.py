@@ -439,8 +439,8 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
         return
 
     couldnt_notify = []
-    text = f"{Emoji.WARN} <a href=\"{santa.link()}\">This Secret Santa</a> has been canceled by its creator, " \
-           f"<b>please ignore this match</b>, as it is no longer valid"
+    text = f"{Emoji.WARN} <a href=\"{santa.link()}\">This Secret Santa</a> has been canceled by its creator. " \
+           f"<b>Please ignore this match</b>, as it is no longer valid"
     for user_id, user_data in santa.participants.items():
         try:
             context.bot.send_message(user_id, text, reply_to_message_id=user_data["match_message_id"])
