@@ -31,6 +31,8 @@ ACTIVE_SECRET_SANTA_KEY = "active_secret_santa"
 
 EMPTY_SECRET_SANTA_STR = f'{Emoji.SANTA}{Emoji.TREE} Nobody joined this Secret Santa yet! Use the "<b>join</b>" button below to join'
 
+CALLBACKS_CACHE_TIME = 60 * 60 * 24
+
 
 updater = Updater(
     bot=ExtBot(
@@ -354,7 +356,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button and start the Secret Santa",
             show_alert=True,
-            cache_time=60*60*24
+            cache_time=CALLBACKS_CACHE_TIME
         )
         return
 
@@ -416,7 +418,7 @@ def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[S
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button. Administrators can use /cancel "
             f"to cancel any active secret Santa",
             show_alert=True,
-            cache_time=60*60*24
+            cache_time=CALLBACKS_CACHE_TIME
         )
         return
 
@@ -434,7 +436,7 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button",
             show_alert=True,
-            cache_time=60*60*24
+            cache_time=CALLBACKS_CACHE_TIME
         )
         return
 
