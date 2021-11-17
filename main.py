@@ -635,11 +635,11 @@ def main():
 
     updater.bot.set_my_commands([])  # make sure the bot doesn't have any command set...
     updater.bot.set_my_commands(  # ...then set the scope for private chats
-        [],
+        [BotCommand("help", "welcome message")],
         scope=BotCommandScopeAllPrivateChats()
     )
     updater.bot.set_my_commands(  # ...then set the scope for group administrators
-        [BotCommand("newsanta", "create the Secret Santa's pairs")],
+        [BotCommand("newsanta", "create a new Secret Santa in this chat")],
         scope=BotCommandScopeAllChatAdministrators()
     )
 
