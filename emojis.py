@@ -7,3 +7,5 @@ class Emoji:
     SNOWMAN_2 = "☃️"
     FREEZE = "🥶"
     CROSS = "❌"
+    HOURGLASS = "⏳"
+    WARN = "⚠️"

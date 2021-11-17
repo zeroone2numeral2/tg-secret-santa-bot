@@ -2,6 +2,7 @@ import datetime
 import logging
 import os
 import pickle
+import random
 import re
 from html import escape
 
@@ -84,6 +85,39 @@ def safe_delete_by_id(bot: Bot, chat_id: int, message_id: int, log_error=True):
         return False
 
 
+def draft(items_list: list):
+    yet_to_match = [i for i in items_list]
+
+    random.shuffle(items_list)
+    random.shuffle(yet_to_match)
+
+    result_pairs = []
+    for item in items_list:
+        if item not in yet_to_match:
+            # we already matched it
+            continue
+
+        picked_item = yet_to_match[0]
+        while item == picked_item:
+            random.shuffle(yet_to_match)
+            picked_item = yet_to_match[0]
+
+        result_pairs.append((item, picked_item))
+        result_pairs.append((picked_item, item))
+
+        # print(f"matched {picked_item} and {item}")
+
+        yet_to_match.remove(item)
+        yet_to_match.remove(picked_item)
+
+        # print(f"matched {item} and {picked_item}, remaining: {', '.join(sorted(yet_to_match))}")
+
+        if not yet_to_match:
+            break
+
+    return result_pairs
+
+
 def persistence_object(file_path='persistence/data.pickle'):
     logger.info('unpickling persistence: %s', file_path)
     try:
@@ -103,4 +137,8 @@ def persistence_object(file_path='persistence/data.pickle'):
         store_user_data=True,
         store_bot_data=False
     )
+
+
+if __name__ == "__main__":
+    draft(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"])
 

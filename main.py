@@ -1,4 +1,5 @@
 import datetime
+import itertools
 import json
 import logging
 import logging.config
@@ -12,7 +13,7 @@ from random import choice
 from typing import List, Callable, Optional
 
 from telegram import Update, TelegramError, Chat, ParseMode, Bot, BotCommandScopeAllPrivateChats, BotCommand, User, \
-    InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions, BotCommandScopeAllChatAdministrators
+    InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions, BotCommandScopeAllChatAdministrators, ChatAction
 from telegram.error import BadRequest
 from telegram.ext import Updater, CallbackContext, Filters, MessageHandler, CallbackQueryHandler, MessageFilter, \
     CommandHandler, ExtBot, Defaults
@@ -157,6 +158,29 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
     participants_count = santa.get_participants_count()
     if not participants_count:
         text = EMPTY_SECRET_SANTA_STR
+        reply_markup = keyboards.secret_santa(
+            santa.chat_id,
+            context.bot.username,
+            participants_count=participants_count
+        )
+    elif santa.started:
+        participants_list = []
+        i = 1
+        for participant_id, participant in santa.participants.items():
+            string = f'<b>{i}</b>. {utilities.mention_escaped_by_id(participant_id, participant["name"])}'
+            participants_list.append(string)
+            i += 1
+
+        base_text = '{santa} This Secret Santa has been started and everyone received their match!\n' \
+                    'Participants list:\n\n' \
+                    '{participants}\n\n' \
+                    '{creator} still has some time to revoke the matches'
+        text = base_text.format(
+            santa=Emoji.SANTA,
+            participants="\n".join(participants_list),
+            creator=santa.creator_name,
+        )
+        reply_markup = keyboards.revoke()
     else:
         participants_list = []
         i = 1
@@ -179,11 +203,11 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
             min_participants=min_participants_text
         )
 
-    reply_markup = keyboards.secret_santa(
-        santa.chat_id,
-        context.bot.username,
-        participants_count=participants_count
-    )
+        reply_markup = keyboards.secret_santa(
+            santa.chat_id,
+            context.bot.username,
+            participants_count=participants_count
+        )
 
     try:
         edited_message = context.bot.edit_message_text(
@@ -273,9 +297,16 @@ def on_join_command(update: Update, context: CallbackContext):
 
     santa_link = gen_santa_link(santa)
 
+    if santa.creator_id == update.effective_user.id:
+        wait_for_start_text = f"\nYou can start it anytime using the \"<b>start</b>\" button in the group, once " \
+                              f"at least {config.santa.min_participants} people have joined"
+    else:
+        wait_for_start_text = f"Now wait for {santa.creator_name_escaped} to start it"
+
     reply_markup = keyboards.leave_private(santa_chat_id)
     update.message.reply_html(
-        f"{Emoji.TREE} You joined {utilities.escape(santa.chat_title)}'s <a href=\"{santa_link}\">Secret Santa</a>!",
+        f"{Emoji.TREE} You joined {santa.chat_title_escaped}'s <a href=\"{santa_link}\">Secret Santa</a>!\n"
+        f"{wait_for_start_text}. You will receive your match here",
         reply_markup=reply_markup
     )
 
@@ -297,6 +328,127 @@ def on_leave_button_group(update: Update, context: CallbackContext, santa: Optio
     update.callback_query.answer(f"You have been removed from this Secret Santa")
 
     return santa
+
+
+@fail_with_message(answer_to_message=False)
+@get_secret_santa()
+def on_start_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("start button: %d", update.effective_chat.id)
+    if santa.creator_id != update.effective_user.id:
+        update.callback_query.answer(
+            f"{Emoji.CROSS} Only {santa.creator_name} can use this button and start the Secret Santa",
+            show_alert=True,
+            cache_time=60*60*24
+        )
+        return
+
+    if santa.get_participants_count() % 2 != 0:
+        logger.debug("number of participants not even")
+        update.callback_query.answer(
+            f"{Emoji.CROSS} The number of participants must be even! Right now {santa.get_participants_count()} "
+            f"people have joined",
+            show_alert=True
+        )
+        return
+
+    sent_message = update.effective_message.reply_html('{} <i>Matching users...</i>'.format(Emoji.HOURGLASS))
+
+    blocked_by = []
+    for user_id, user_data in santa.participants.items():
+        try:
+            context.bot.send_chat_action(user_id, ChatAction.TYPING)
+        except (TelegramError, BadRequest) as e:
+            if "bot was blocked by the user" in str(e).lower():
+                blocked_by.append(utilities.mention_escaped_by_id(user_id, user_data["name"]))
+
+    if blocked_by:
+        users_list = ", ".join(blocked_by)
+        text = f"I can't start the Secret Santa because some users ({users_list}) have blocked me. " \
+               f"They need to unblock me so I can send them their match"
+        sent_message.edit_text(text)
+        return
+
+    matches = utilities.draft(list(santa.participants.keys()))
+    santa_link = gen_santa_link(santa)
+    for receiver_id, match_id in matches:
+        match_name = santa.get_user_name(match_id)
+        match_mention = utilities.mention_escaped_by_id(match_id, match_name)
+
+        text = f"{Emoji.SANTA}{Emoji.PRESENT} Your <a href=\"{santa_link}\">Secret Santa</a> match is " \
+               f"{match_mention}! Do not reveal this name to anyone :)"
+        match_message = context.bot.send_message(receiver_id, text)
+        santa.set_user_match_message_id(receiver_id, match_message.message_id)
+
+    text = f"Everyone has received their match in their <b>private chats</b>! {santa.creator_name_escaped} " \
+           f"still has some time to revoke this Secret Santa's matches"
+    sent_message.edit_text(text)
+
+    santa.started = True
+    update_secret_santa_message(context, santa)
+
+
+@fail_with_message(answer_to_message=False)
+@get_secret_santa()
+def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("cancel button: %d", update.effective_chat.id)
+    if santa.creator_id != update.effective_user.id:
+        update.callback_query.answer(
+            f"{Emoji.CROSS} Only {santa.creator_name} can use this button. Administrators can use /cancel "
+            f"to cancel any active secret Santa",
+            show_alert=True,
+            cache_time=60*60*24
+        )
+        return
+
+    context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+
+    text = "<i>This Secret Santa has ben canceled by its creator</i>"
+    update.callback_query.edit_message_text(text, reply_markup=None)
+
+
+@fail_with_message(answer_to_message=False)
+@get_secret_santa()
+def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("revoke button: %d", update.effective_chat.id)
+    if santa.creator_id != update.effective_user.id:
+        update.callback_query.answer(
+            f"{Emoji.CROSS} Only {santa.creator_name} can use this button",
+            show_alert=True,
+            cache_time=60*60*24
+        )
+        return
+
+    santa_link = gen_santa_link(santa)
+    text = f"{Emoji.WARN} <a href=\"{santa_link}\">This Secret Santa</a> has been canceled by its creator, " \
+           f"<b>please ignore this match</b> as it is no longer valid"
+    for user_id, user_data in santa.participants.items():
+        try:
+            context.bot.send_message(user_id, text, reply_to_message_id=user_data["match_message_id"])
+        except (BadRequest, TelegramError) as e:
+            logger.error("could not send revoke notification to %d: %s", user_id, str(e))
+
+    santa.started = False
+    update_secret_santa_message(context, santa)
+
+    update.callback_query.answer(f"Participants have been notified, Secret Santa re-opened", show_alert=True)
+
+
+@fail_with_message(answer_to_message=False)
+@get_secret_santa()
+def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("/cancel command: %d", update.effective_chat.id)
+
+    if not santa:
+        update.message.reply_html("<i>There is no active Secret Santa</i>")
+        return
+
+    user_id = update.effective_user.id
+    if not santa.creator_id != user_id and user_id not in get_admin_ids(context.bot, update.effective_chat.id):
+        return
+
+    context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+
+    update.message.reply_html("<i>This chat's Secret Santa has ben canceled</i>")
 
 
 @fail_with_message(answer_to_message=False)
@@ -363,9 +515,13 @@ def main():
     dispatcher.add_handler(MessageHandler(new_group_filter, on_new_group_chat))
 
     dispatcher.add_handler(CommandHandler(["new"], on_new_secret_santa_command, filters=Filters.chat_type.supergroup))
+    dispatcher.add_handler(CommandHandler(["cancel"], on_cancel_command, filters=Filters.chat_type.supergroup))
     dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_command))
 
+    dispatcher.add_handler(CallbackQueryHandler(on_start_button, pattern=r'^start'))
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_group, pattern=r'^leave$'))
+    dispatcher.add_handler(CallbackQueryHandler(on_cancel_button, pattern=r'^cancel'))
+    dispatcher.add_handler(CallbackQueryHandler(on_revoke_button, pattern=r'^revoke'))
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_private, pattern=r'^private:leave:(-\d+)$'))
 
     updater.job_queue.run_repeating(cleanup_and_ban, interval=60, first=60)

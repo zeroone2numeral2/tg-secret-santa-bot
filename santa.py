@@ -30,6 +30,7 @@ class SecretSanta:
             participants: Optional[dict] = None,
             created_on: Optional[datetime.datetime] = None,
             updated_on: Optional[datetime.datetime] = None,
+            started: bool = False
     ):
         now = utilities.now()
         self._santa_dict = {
@@ -41,7 +42,8 @@ class SecretSanta:
             "user_id": user_id,
             "user_name": user_name,
             "chat_id": chat_id,
-            "chat_title": chat_title
+            "chat_title": chat_title,
+            "started": started
         }
 
     @classmethod
@@ -96,6 +98,14 @@ class SecretSanta:
     @santa_message_id.setter
     def santa_message_id(self, santa_message_id):
         self._santa_dict["santa_message_id"] = santa_message_id
+
+    @property
+    def started(self):
+        return self._santa_dict["started"]
+
+    @started.setter
+    def started(self, new_value):
+        self._santa_dict["started"] = new_value
 
     @property
     def message_id(self):
@@ -169,6 +179,10 @@ class SecretSanta:
     def get_user_match_message_id(self, user: Union[int, User]) -> int:
         user_id = self.user_id(user)
         return self._santa_dict["participants"][user_id]["match_message_id"]
+
+    def set_user_match_message_id(self, user: Union[int, User], message_id: int):
+        user_id = self.user_id(user)
+        self._santa_dict["participants"][user_id]["match_message_id"] = message_id
 
     def get_user_name(self, user: Union[int, User]) -> str:
         user_id = self.user_id(user)

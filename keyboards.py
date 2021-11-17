@@ -17,11 +17,18 @@ def secret_santa(chat_id: int, bot_username: str, participants_count: int = 0):
         keyboard[0].append(unsubscribe_button)
 
     if participants_count >= config.santa.min_participants:
-        start_button = InlineKeyboardButton(f"{Emoji.SANTA}", callback_data=f"start")
+        start_button = InlineKeyboardButton(f"{Emoji.SANTA} start", callback_data=f"start")
         keyboard[1].append(start_button)
 
     return InlineKeyboardMarkup(keyboard)
 
 
 def leave_private(chat_id: int):
-    return InlineKeyboardMarkup([[InlineKeyboardButton(f"{Emoji.FREEZE} leave", callback_data=f"private:leave:{chat_id}")]])
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(f"{Emoji.FREEZE} leave", callback_data=f"private:leave:{chat_id}")]]
+    )
+
+
+def revoke():
+    return InlineKeyboardMarkup([[InlineKeyboardButton(f"{Emoji.CROSS} revoke", callback_data=f"revoke")]])
+
