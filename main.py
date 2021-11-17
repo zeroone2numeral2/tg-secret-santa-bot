@@ -632,7 +632,10 @@ def main():
         scope=BotCommandScopeAllPrivateChats()
     )
     updater.bot.set_my_commands(  # ...then set the scope for group administrators
-        [BotCommand("newsanta", "create a new Secret Santa in this chat")],
+        [
+            BotCommand("newsanta", "create a new Secret Santa in this chat"),
+            BotCommand("cancel", "cancel any ongoing Secret Santa")
+        ],
         scope=BotCommandScopeAllChatAdministrators()
     )
 
