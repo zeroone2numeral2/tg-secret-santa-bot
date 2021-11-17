@@ -129,6 +129,22 @@ def fail_with_message(answer_to_message=True):
     return real_decorator
 
 
+def fail_with_message_job(func):
+    @wraps(func)
+    def wrapped(context: CallbackContext, *args, **kwargs):
+        try:
+            return func(context, *args, **kwargs)
+        except Exception as e:
+            error_str = str(e)
+            logger.error('error while running job: %s', error_str, exc_info=True)
+
+            error_str_message = f"Error during job callback <code>{func.__name__}()</code> execution: <code>{error_str}</code>"
+            if config.telegram.log_chat:
+                context.bot.send_message(config.telegram.log_chat, f"#santa_bot {error_str_message}")
+
+    return wrapped
+
+
 def get_secret_santa():
     def real_decorator(func):
         @wraps(func)
@@ -573,6 +589,7 @@ def secret_santa_expired(context: CallbackContext, santa: SecretSanta):
     return edited_message
 
 
+@fail_with_message_job
 def cleanup(context: CallbackContext):
     logger.info("cleanup job...")
 
