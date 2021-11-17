@@ -86,6 +86,8 @@ def safe_delete_by_id(bot: Bot, chat_id: int, message_id: int, log_error=True):
 
 
 def draft(items_list: list):
+    logger = logging.getLogger("draft")
+
     yet_to_match = [i for i in items_list]
 
     random.shuffle(items_list)
@@ -105,12 +107,13 @@ def draft(items_list: list):
         result_pairs.append((item, picked_item))
         result_pairs.append((picked_item, item))
 
-        # print(f"matched {picked_item} and {item}")
+        logger.debug(f"matched {picked_item} and {item}")
 
         yet_to_match.remove(item)
         yet_to_match.remove(picked_item)
 
-        # print(f"matched {item} and {picked_item}, remaining: {', '.join(sorted(yet_to_match))}")
+        yet_to_match_str = ', '.join([f"{i}" for i in sorted(yet_to_match)])
+        logger.debug(f"matched {item} and {picked_item}, remaining: {yet_to_match_str}")
 
         if not yet_to_match:
             break
