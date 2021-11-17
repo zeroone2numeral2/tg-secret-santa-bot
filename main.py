@@ -352,7 +352,7 @@ def on_leave_button_group(update: Update, context: CallbackContext, santa: Optio
 
 @fail_with_message(answer_to_message=False)
 @get_secret_santa()
-def on_start_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+def on_match_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("start button: %d", update.effective_chat.id)
     if santa.creator_id != update.effective_user.id:
         update.callback_query.answer(
@@ -624,7 +624,7 @@ def main():
     dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_command))
     dispatcher.add_handler(CommandHandler(["start", "help"], on_help, filters=Filters.chat_type.private))
 
-    dispatcher.add_handler(CallbackQueryHandler(on_start_button, pattern=r'^start'))
+    dispatcher.add_handler(CallbackQueryHandler(on_match_button, pattern=r'^match'))
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_group, pattern=r'^leave$'))
     dispatcher.add_handler(CallbackQueryHandler(on_cancel_button, pattern=r'^cancel'))
     dispatcher.add_handler(CallbackQueryHandler(on_revoke_button, pattern=r'^revoke'))

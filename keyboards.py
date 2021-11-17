@@ -17,7 +17,7 @@ def secret_santa(chat_id: int, bot_username: str, participants_count: int = 0):
         keyboard[0].append(unsubscribe_button)
 
     if participants_count >= config.santa.min_participants:
-        start_button = InlineKeyboardButton(f"{Emoji.SANTA} start", callback_data=f"start")
+        start_button = InlineKeyboardButton(f"{Emoji.SANTA} start match", callback_data=f"match")
         keyboard[1].append(start_button)
 
     return InlineKeyboardMarkup(keyboard)
