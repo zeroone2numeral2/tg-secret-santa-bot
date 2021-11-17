@@ -478,25 +478,37 @@ def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[
     update.message.reply_html("<i>This chat's Secret Santa has ben canceled</i>")
 
 
+def private_chat_button():
+    def real_decorator(func):
+        @wraps(func)
+        def wrapped(update: Update, context: CallbackContext, *args, **kwargs):
+            santa_chat_id = int(context.matches[0].group(1))
+            logger.debug("chat_id: %d", santa_chat_id)
+
+            santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
+            if not santa:
+                # we do not edit or delete this message when a Secrt Santa is started, so we leave the button there
+                update.callback_query.answer(f"This chat's Secret Santa is no longer valid", show_alert=True)
+                update.callback_query.edit_message_reply_markup(reply_markup=None)
+                return
+
+            if not santa.is_participant(update.effective_user):
+                # maybe the user left from the group's message
+                update.callback_query.answer(f"{Emoji.FREEZE} You are not participating in this Secret Santa!",
+                                             show_alert=True)
+                update.callback_query.edit_message_reply_markup(reply_markup=None)
+                return
+
+            return func(update, context, santa, *args, **kwargs)
+
+        return wrapped
+    return real_decorator
+
+
 @fail_with_message(answer_to_message=False)
-def on_update_name_button_private(update: Update, context: CallbackContext):
+@private_chat_button()
+def on_update_name_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("update name button in private: %d", update.effective_chat.id)
-
-    santa_chat_id = int(context.matches[0].group(1))
-    logger.debug("chat_id: %d", santa_chat_id)
-
-    santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
-    if not santa:
-        # we do not edit or delete this message when a Secrt Santa is started, so we leave the button there
-        update.callback_query.answer(f"This chat's Secret Santa is no longer valid", show_alert=True)
-        update.callback_query.edit_message_reply_markup(reply_markup=None)
-        return
-
-    if not santa.is_participant(update.effective_user):
-        # maybe the user left from the group's message
-        update.callback_query.answer(f"{Emoji.FREEZE} You are not participating in this Secret Santa!", show_alert=True)
-        update.callback_query.edit_message_reply_markup(reply_markup=None)
-        return
 
     name = update.effective_user.first_name
     santa.set_user_name(update.effective_user, name)
@@ -509,24 +521,8 @@ def on_update_name_button_private(update: Update, context: CallbackContext):
 
 
 @fail_with_message(answer_to_message=False)
-def on_leave_button_private(update: Update, context: CallbackContext):
+def on_leave_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("leave button in private: %d", update.effective_chat.id)
-
-    santa_chat_id = int(context.matches[0].group(1))
-    logger.debug("chat_id: %d", santa_chat_id)
-
-    santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
-    if not santa:
-        # we do not edit or delete this message when a Secrt Santa is started, so we leave the button there
-        update.callback_query.answer(f"This chat's Secret Santa is no longer valid", show_alert=True)
-        update.callback_query.edit_message_reply_markup(reply_markup=None)
-        return
-
-    if not santa.is_participant(update.effective_user):
-        # maybe the user left from the group's message
-        update.callback_query.answer(f"{Emoji.FREEZE} You are not participating in this Secret Santa!", show_alert=True)
-        update.callback_query.edit_message_reply_markup(reply_markup=None)
-        return
 
     santa.remove(update.effective_user)
     update_secret_santa_message(context, santa)
