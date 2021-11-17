@@ -12,3 +12,4 @@ class Emoji:
     SHH = "🤫"
     LIST = "📜"
     SAD = "😔"
+    TRASH = "🗑"
