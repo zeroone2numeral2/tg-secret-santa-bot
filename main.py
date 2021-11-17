@@ -418,6 +418,7 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
         )
         return
 
+    couldnt_notify = []
     santa_link = gen_santa_link(santa)
     text = f"{Emoji.WARN} <a href=\"{santa_link}\">This Secret Santa</a> has been canceled by its creator, " \
            f"<b>please ignore this match</b> as it is no longer valid"
@@ -426,11 +427,17 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
             context.bot.send_message(user_id, text, reply_to_message_id=user_data["match_message_id"])
         except (BadRequest, TelegramError) as e:
             logger.error("could not send revoke notification to %d: %s", user_id, str(e))
+            couldnt_notify.append(user_data["name"])
 
     santa.started = False
     update_secret_santa_message(context, santa)
 
-    update.callback_query.answer(f"Participants have been notified, Secret Santa re-opened", show_alert=True)
+    text = f"Participants have been notified, Secret Santa re-opened"
+    if couldnt_notify:
+        text = f"{text}. However, I've not been able to message {', '.join(couldnt_notify)}. " \
+               f"You may want to notify them"
+
+    update.callback_query.answer(text, show_alert=True)
 
 
 @fail_with_message(answer_to_message=False)
@@ -449,6 +456,36 @@ def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[
     context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
 
     update.message.reply_html("<i>This chat's Secret Santa has ben canceled</i>")
+
+
+@fail_with_message(answer_to_message=False)
+def on_update_name_button_private(update: Update, context: CallbackContext):
+    logger.debug("update name button in private: %d", update.effective_chat.id)
+
+    santa_chat_id = int(context.matches[0].group(1))
+    logger.debug("chat_id: %d", santa_chat_id)
+
+    santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
+    if not santa:
+        # we do not edit or delete this message when a Secrt Santa is started, so we leave the button there
+        update.callback_query.answer(f"This chat's Secret Santa is no longer valid", show_alert=True)
+        update.callback_query.edit_message_reply_markup(reply_markup=None)
+        return
+
+    if not santa.is_participant(update.effective_user):
+        # maybe the user left from the group's message
+        update.callback_query.answer(f"{Emoji.FREEZE} You are not participating in this Secret Santa!", show_alert=True)
+        update.callback_query.edit_message_reply_markup(reply_markup=None)
+        return
+
+    name = update.effective_user.first_name
+    santa.set_user_name(update.effective_user, name)
+
+    update.callback_query.answer(f"Your name has been updated to: {name}\nThis option allows you to change your "
+                                 f"Telegram name and update it the list (in case there are participants with a "
+                                 f"similar name)", show_alert=True)
+
+    update_secret_santa_message(context, santa)
 
 
 @fail_with_message(answer_to_message=False)
@@ -523,6 +560,7 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(on_cancel_button, pattern=r'^cancel'))
     dispatcher.add_handler(CallbackQueryHandler(on_revoke_button, pattern=r'^revoke'))
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_private, pattern=r'^private:leave:(-\d+)$'))
+    dispatcher.add_handler(CallbackQueryHandler(on_update_name_button_private, pattern=r'^private:updatename:(-\d+)$'))
 
     updater.job_queue.run_repeating(cleanup_and_ban, interval=60, first=60)
 

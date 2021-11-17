@@ -188,6 +188,10 @@ class SecretSanta:
         user_id = self.user_id(user)
         return self._santa_dict["participants"][user_id]["name"]
 
+    def set_user_name(self, user: Union[int, User], name: str):
+        user_id = self.user_id(user)
+        self._santa_dict["participants"][user_id]["name"] = name
+
     def __str__(self):
         return f"{type(self).__name__}(id={self.origin_message_id}, participants={self.get_participants_count()}, updated_on={self.updated_on})"
 
