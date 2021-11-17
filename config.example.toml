@@ -7,4 +7,4 @@ log_chat = 0
 
 [santa]
 min_participants = 4
-timeout = 72 # hours
+timeout = 72
