@@ -200,7 +200,7 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
         participants_list = gen_participants_list(santa.participants)
 
         min_participants_text = ""
-        if santa.get_missing_count():
+        if santa.get_missing_count() > 0:
             min_participants_text = f". Other <b>{santa.get_missing_count()}</b> people are needed to start it"
 
         base_text = '{santa} Oh-oh! A new Secret Santa!\nParticipants list:\n\n{participants}\n\n' \
