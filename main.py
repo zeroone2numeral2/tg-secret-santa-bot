@@ -558,7 +558,7 @@ def on_help(update: Update, _):
     logger.info("/start or /help from: %s", update.effective_user.id)
 
     source_code = "https://github.com/zeroone2numeral2/tg-secret-santa-bot"
-    text = f"Hello {update.effective_user.first_name}!" \
+    text = f"Hello {utilities.html_escape(update.effective_user.first_name)}!" \
            f"\nI can help you organize a Secret Santa 🤫🎅🏼🎁 in your group chats :)\n" \
            f"Just add me to a chat and use <code>/newsanta</code> to start a new Secret Santa." \
            f"\n\nSource code <a href=\"{source_code}\">here</a>"
