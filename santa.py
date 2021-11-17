@@ -57,7 +57,8 @@ class SecretSanta:
             santa_message_id=santa_dict["santa_message_id"],
             participants=santa_dict["participants"],
             created_on=santa_dict["created_on"],
-            updated_on=santa_dict["updated_on"]
+            updated_on=santa_dict["updated_on"],
+            started=santa_dict["started"],
         )
 
     def dict(self):
