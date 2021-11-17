@@ -257,7 +257,7 @@ def on_new_secret_santa_command(update: Update, context: CallbackContext, secret
 
             update.message.reply_html(f"{Emoji.SANTA} There is already an active Secret Santa"
                                       f" in this chat! You can ask {secret_santa.creator_name_escaped} "
-                                      f"(or an administrator) to cancel it using /cancel")
+                                      f"(or an administrator) to cancel it using <code>/cancel</code>")
 
         return
 
