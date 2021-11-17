@@ -611,8 +611,8 @@ def main():
     new_group_filter = NewGroup()
     dispatcher.add_handler(MessageHandler(new_group_filter, on_new_group_chat))
 
-    dispatcher.add_handler(CommandHandler(["new", "newsanta", "santa"], on_new_secret_santa_command, filters=Filters.chat_type.supergroup))
-    dispatcher.add_handler(CommandHandler(["cancel"], on_cancel_command, filters=Filters.chat_type.supergroup))
+    dispatcher.add_handler(CommandHandler(["new", "newsanta", "santa"], on_new_secret_santa_command, filters=Filters.chat_type.groups))
+    dispatcher.add_handler(CommandHandler(["cancel"], on_cancel_command, filters=Filters.chat_type.groups))
     dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_command))
     dispatcher.add_handler(CommandHandler(["start", "help"], on_help, filters=Filters.chat_type.private))
 
