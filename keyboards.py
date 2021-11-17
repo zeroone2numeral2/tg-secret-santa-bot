@@ -8,7 +8,7 @@ def secret_santa(chat_id: int, bot_username: str, participants_count: int = 0):
     # knowing the message id is not really needed because a caht can only have one ongoing secret chat
     deeplink_url = f"https://t.me/{bot_username}?start={chat_id}"
     keyboard = [
-        [InlineKeyboardButton(f"{Emoji.PRESENT} join", url=deeplink_url)],
+        [InlineKeyboardButton(f"{Emoji.LIST} join", url=deeplink_url)],
         [InlineKeyboardButton(f"{Emoji.CROSS} cancel", callback_data=f"cancel")],
     ]
 
@@ -27,7 +27,7 @@ def leave_private(chat_id: int):
     return InlineKeyboardMarkup(
         [[
             InlineKeyboardButton(f"{Emoji.FREEZE} leave", callback_data=f"private:leave:{chat_id}"),
-            InlineKeyboardButton(f"{Emoji.SNOWMAN} update your name", callback_data=f"private:updatename:{chat_id}")
+            InlineKeyboardButton(f"{Emoji.LIST} update your name", callback_data=f"private:updatename:{chat_id}")
         ]]
     )
 
