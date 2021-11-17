@@ -14,7 +14,7 @@ from random import choice
 from typing import List, Callable, Optional
 
 from telegram import Update, TelegramError, Chat, ParseMode, Bot, BotCommandScopeAllPrivateChats, BotCommand, User, \
-    InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions, BotCommandScopeAllChatAdministrators, ChatAction
+    BotCommandScopeAllChatAdministrators, ChatAction
 from telegram.error import BadRequest
 from telegram.ext import Updater, CallbackContext, Filters, MessageHandler, CallbackQueryHandler, MessageFilter, \
     CommandHandler, ExtBot, Defaults
