@@ -2,10 +2,13 @@ import datetime
 import logging
 import os
 import pickle
+import re
 from html import escape
 
 # noinspection PyPackageRequirements
-from telegram import Message, User, Bot
+from typing import Union
+
+from telegram import Message, User, Bot, Chat
 # noinspection PyPackageRequirements
 from telegram.ext import PicklePersistence
 
@@ -14,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 def now_utc():
     return datetime.datetime.utcnow()
+
+
+def now():
+    return datetime.datetime.now()
 
 
 def html_escape(string: str):
@@ -25,6 +32,36 @@ def mention_escaped(user: User, label="", full_name=False):
         label = user.first_name if not full_name else user.full_name
 
     return user.mention_html(html_escape(label))
+
+
+def mention_escaped_by_id(user_id: int, name: str):
+    return f'<a href="tg://user?id={user_id}">{html_escape(name)}</a>'
+
+
+def first_dict_item(origin_dict: dict):
+    for _, val in origin_dict.items():
+        return val
+
+
+def is_supergroup(chat: Union[Chat, int]):
+    chat_id = chat
+    if isinstance(chat, Chat):
+        chat_id = chat.id
+
+    return str(chat_id).startswith("-100")
+
+
+def chat_id_link(chat_id: int):
+    return int(re.sub(r"^-?100", "", str(chat_id)))
+
+
+def message_link(chat: Union[Chat, int], message_id: int, force_private=False):
+    chat_id = chat.id if isinstance(chat, Chat) else chat
+
+    if isinstance(chat, Chat) and not force_private and chat.username:
+        return f"https://t.me/{chat.username}/{message_id}"
+
+    return f"https://t.me/c/{chat_id_link(chat_id)}/{message_id}"
 
 
 def safe_delete(message: Message):

@@ -1,16 +1,8 @@
 [telegram]
 token = ""
+workers = 1
 admins = []
 exit_unknown_groups = true # exit groups if not added by an user id in 'admins'
 
-[captcha]
-image_path = '''assets/bg.default.png'''
-image_max_side = 512 # max image size (largest side), 0 to disable resizing
-image_scale_factor = 0.0 # scale factor to applly after resizing to image_max_side, 0 to disable scaling
-image_emojis = 3 # how many emojis to paste on the image
-image_emojis_correct_threshold = 2 # how many emojis the user have to guess to consider the captcha completed (can be less than 'image_emojis'. 'image_emojis' will be used if 0)
-image_buttons = 6 # how many buttons the image should have
-allowed_errors = 2 # mistakes an user can do while solving a captcha (allowed_errors + 1 -> test failed)
-timeout = 20 # after how long to ban people with a pending capctha (in minutes)
-send_message_on_fail = true # send a message if the user fails the captcha, or the timeout expires
-delete_service_message = true # delete the service message when the captcha is solved/failed/expired
+[santa]
+min_participants = 4
