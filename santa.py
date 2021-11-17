@@ -141,12 +141,18 @@ class SecretSanta:
         return config.santa.min_participants - self.get_participants_count()
 
     # @update_time
-    def add(self, user: User, match_message_id: Optional[int] = None) -> bool:
+    def add(
+            self,
+            user: User,
+            match_message_id: Optional[int] = None,
+            join_message_id: Optional[int] = None,
+    ) -> bool:
         already_a_participant = user.id in self.participants
 
         self._santa_dict["participants"][user.id] = {
             "name": user.first_name,
-            "match_message_id": match_message_id
+            "match_message_id": match_message_id,
+            "last_join_message_id": join_message_id
         }
 
         return already_a_participant
@@ -185,6 +191,15 @@ class SecretSanta:
         user_id = self.user_id(user)
         self._santa_dict["participants"][user_id]["match_message_id"] = message_id
 
+    def get_user_join_message_id(self, user: Union[int, User]) -> int:
+        user_id = self.user_id(user)
+        # noinspection PyTypeChecker
+        return self._santa_dict["participants"][user_id]["last_join_message_id"]
+
+    def set_user_join_message_id(self, user: Union[int, User], message_id: int):
+        user_id = self.user_id(user)
+        self._santa_dict["participants"][user_id]["last_join_message_id"] = message_id
+
     def get_user_name(self, user: Union[int, User]) -> str:
         user_id = self.user_id(user)
         # noinspection PyTypeChecker
@@ -193,6 +208,28 @@ class SecretSanta:
     def set_user_name(self, user: Union[int, User], name: str):
         user_id = self.user_id(user)
         self._santa_dict["participants"][user_id]["name"] = name
+
+    def user_mention_escaped(self, user: Union[int, User]) -> str:
+        user_id = self.user_id(user)
+        # noinspection PyTypeChecker
+        name = self._santa_dict["participants"][user_id]["name"]
+
+        return utilities.mention_escaped_by_id(user_id, name)
+
+    def link(self):
+        link = ""
+        if utilities.is_supergroup(self.chat_id):
+            link = utilities.message_link(self.chat_id, self.santa_message_id, force_private=True)
+
+        return link
+
+    def inline_link(self, text: str, escape=False):
+        if not utilities.is_supergroup(self.chat_id):
+            return text
+
+        link = self.link()
+        text = text if not escape else utilities.html_escape(text)
+        return f"<a href=\"{link}\">{text}</a>"
 
     def __str__(self):
         return f"{type(self).__name__}(id={self.origin_message_id}, participants={self.get_participants_count()}, updated_on={self.updated_on})"

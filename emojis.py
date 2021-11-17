@@ -9,3 +9,5 @@ class Emoji:
     CROSS = "❌"
     HOURGLASS = "⏳"
     WARN = "⚠️"
+    SHH = "🤫"
+    LIST = "📜"
