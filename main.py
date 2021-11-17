@@ -296,11 +296,11 @@ def find_santa(dispatcher_user_data: dict, santa_chat_id: int):
 @fail_with_message()
 def on_join_command(update: Update, context: CallbackContext):
     santa_chat_id = int(context.matches[0].group(1))
-    logger.debug("start command from %d: %d", update.effective_user.id, santa_chat_id)
+    logger.debug("join command from %d: %d", update.effective_user.id, santa_chat_id)
 
     santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
     if not santa:
-        raise ValueError(f"chat {santa_chat_id} should allow users to join (no actve santa), but an user joined")
+        raise ValueError(f"user tried to join, but no secret santa is active in {santa_chat_id}")
 
     santa.add(update.effective_user)
     context.dispatcher.chat_data[santa_chat_id][ACTIVE_SECRET_SANTA_KEY] = santa.dict()
@@ -314,7 +314,7 @@ def on_join_command(update: Update, context: CallbackContext):
     reply_markup = keyboards.joined_message(santa_chat_id)
     sent_message = update.message.reply_html(
         f"{Emoji.TREE} You joined {santa.chat_title_escaped}'s {santa.inline_link('Secret Santa')}!\n"
-        f"{wait_for_start_text}. You will receive your match here",
+        f"{wait_for_start_text}. You will receive your match here, in your chat",
         reply_markup=reply_markup
     )
 
