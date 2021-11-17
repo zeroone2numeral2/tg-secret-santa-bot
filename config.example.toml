@@ -2,7 +2,7 @@
 token = ""
 workers = 1
 admins = []
-exit_unknown_groups = true # exit groups if not added by an user id in 'admins'
+exit_unknown_groups = false # exit groups if not added by an user id in 'admins'
 log_chat = 0
 
 [santa]
