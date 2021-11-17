@@ -178,6 +178,7 @@ class SecretSanta:
 
     def get_user_match_message_id(self, user: Union[int, User]) -> int:
         user_id = self.user_id(user)
+        # noinspection PyTypeChecker
         return self._santa_dict["participants"][user_id]["match_message_id"]
 
     def set_user_match_message_id(self, user: Union[int, User], message_id: int):
@@ -186,6 +187,7 @@ class SecretSanta:
 
     def get_user_name(self, user: Union[int, User]) -> str:
         user_id = self.user_id(user)
+        # noinspection PyTypeChecker
         return self._santa_dict["participants"][user_id]["name"]
 
     def set_user_name(self, user: Union[int, User], name: str):
