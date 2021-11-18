@@ -35,3 +35,7 @@ def joined_message(chat_id: int):
 def revoke():
     return InlineKeyboardMarkup([[InlineKeyboardButton(f"{Emoji.CROSS} revoke", callback_data=f"revoke")]])
 
+
+def new_santa():
+    return InlineKeyboardMarkup([[InlineKeyboardButton(f"{Emoji.TREE} new Secret Santa", callback_data=f"newsanta")]])
+

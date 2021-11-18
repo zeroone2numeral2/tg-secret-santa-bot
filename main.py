@@ -31,7 +31,18 @@ ACTIVE_SECRET_SANTA_KEY = "active_secret_santa"
 
 EMPTY_SECRET_SANTA_STR = f'{Emoji.SANTA}{Emoji.TREE} Nobody joined this Secret Santa yet! Use the "<b>join</b>" button below to join'
 
-CALLBACKS_CACHE_TIME = 60 * 60 * 24
+
+class Time:
+    WEEK_4 = 60 * 60 * 24 * 7 * 4
+    WEEK_1 = 60 * 60 * 24 * 7
+    DAY_3 = 60 * 60 * 24 * 3
+    DAY_1 = 60 * 60 * 24
+    HOUR_48 = 60 * 60 * 48
+    HOUR_12 = 60 * 60 * 12
+    HOUR_6 = 60 * 60 * 6
+    HOUR_1 = 60 * 60
+    MINUTE_30 = 60 * 30
+    MINUTE_1 = 60
 
 
 updater = Updater(
@@ -237,20 +248,17 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
     return edited_message
 
 
-@fail_with_message()
-@get_secret_santa()
-def on_new_secret_santa_command(update: Update, context: CallbackContext, secret_santa: Optional[SecretSanta] = None):
-    logger.debug("/new from %d -> %d", update.effective_user.id, update.effective_chat.id)
-    if secret_santa:
-        text_message_exists = f"👆 There is already an <a href=\"{secret_santa.link()}\">active Secret Santa</a> in " \
+def create_new_secret_santa(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    if santa:
+        text_message_exists = f"👆 There is already an <a href=\"{santa.link()}\">active Secret Santa</a> in " \
                               f"this chat! " \
-                              f"You can ask {secret_santa.creator_name_escaped} to cancel it using the message's " \
+                              f"You can ask {santa.creator_name_escaped} to cancel it using the message's " \
                               f"buttons"
         try:
             context.bot.send_message(
                 update.effective_chat.id,
                 text_message_exists,
-                reply_to_message_id=secret_santa.santa_message_id,
+                reply_to_message_id=santa.santa_message_id,
                 allow_sending_without_reply=False
             )
         except (TelegramError, BadRequest) as e:
@@ -258,13 +266,13 @@ def on_new_secret_santa_command(update: Update, context: CallbackContext, secret
                 raise e
 
             update.message.reply_html(f"{Emoji.SANTA} There is already an active Secret Santa"
-                                      f" in this chat! You can ask {secret_santa.creator_name_escaped} "
+                                      f" in this chat! You can ask {santa.creator_name_escaped} "
                                       f"(or an administrator) to cancel it using <code>/cancel</code>")
 
         return
 
     new_secret_santa = SecretSanta(
-        origin_message_id=update.message.message_id,
+        origin_message_id=update.effective_message.message_id,
         user_id=update.effective_user.id,
         user_name=update.effective_user.first_name,
         chat_id=update.effective_chat.id,
@@ -272,14 +280,35 @@ def on_new_secret_santa_command(update: Update, context: CallbackContext, secret
     )
 
     reply_markup = keyboards.secret_santa(update.effective_chat.id, context.bot.username)
-    sent_message = update.message.reply_html(
-        EMPTY_SECRET_SANTA_STR,
-        reply_markup=reply_markup
-    )
+    if update.callback_query:
+        update.callback_query.edit_message_text(EMPTY_SECRET_SANTA_STR, reply_markup=reply_markup)
+        santa_message_id = update.effective_message.message_id
+    else:
+        sent_message = update.message.reply_html(
+            EMPTY_SECRET_SANTA_STR,
+            reply_markup=reply_markup
+        )
+        santa_message_id = sent_message.message_id
 
-    new_secret_santa.santa_message_id = sent_message.message_id
+    new_secret_santa.santa_message_id = santa_message_id
 
     return new_secret_santa
+
+
+@fail_with_message()
+@get_secret_santa()
+def on_new_secret_santa_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("/new from %d -> %d", update.effective_user.id, update.effective_chat.id)
+
+    return create_new_secret_santa(update, context, santa)
+
+
+@fail_with_message()
+@get_secret_santa()
+def on_new_secret_santa_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("new secret santa button from %d -> %d", update.effective_user.id, update.effective_chat.id)
+
+    return create_new_secret_santa(update, context, santa)
 
 
 def find_santa(dispatcher_user_data: dict, santa_chat_id: int):
@@ -314,8 +343,8 @@ def on_join_command(update: Update, context: CallbackContext):
     context.dispatcher.chat_data[santa_chat_id][ACTIVE_SECRET_SANTA_KEY] = santa.dict()
 
     if santa.creator_id == update.effective_user.id:
-        wait_for_start_text = f"\nYou can start it anytime using the \"<b>start</b>\" button in the group, once " \
-                              f"at least {config.santa.min_participants} people have joined"
+        wait_for_start_text = f"\nYou can start it anytime using the \"<b>start match</b>\" button in the group, " \
+                              f"once at least {config.santa.min_participants} people have joined"
     else:
         wait_for_start_text = f"Now wait for {santa.creator_name_escaped} to start it"
 
@@ -362,7 +391,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button and start the Secret Santa",
             show_alert=True,
-            cache_time=CALLBACKS_CACHE_TIME
+            cache_time=Time.DAY_3
         )
         return
 
@@ -424,7 +453,7 @@ def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[S
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button. Administrators can use /cancel "
             f"to cancel any active secret Santa",
             show_alert=True,
-            cache_time=CALLBACKS_CACHE_TIME
+            cache_time=Time.DAY_3
         )
         return
 
@@ -442,7 +471,7 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button",
             show_alert=True,
-            cache_time=CALLBACKS_CACHE_TIME
+            cache_time=Time.DAY_3
         )
         return
 
@@ -561,6 +590,20 @@ def on_new_group_chat(update: Update, _):
         update.effective_chat.leave()
         return
 
+    if not config.santa.start_button_on_new_group:
+        return
+
+    text = f"Hello everyone! I'm a bot that helps group chats to organize their " \
+           f"Secret Santas {Emoji.SANTA}{Emoji.SHH}\n" \
+           f"Anyone can use the button below to start a new one. Alternatively, the <code>/newsanta</code> command " \
+           f"can be used"
+
+    update.message.reply_html(
+        text,
+        reply_markup=keyboards.new_santa(),
+        quote=False,
+    )
+
 
 @fail_with_message()
 def on_help(update: Update, _):
@@ -633,14 +676,15 @@ def main():
     dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_command))
     dispatcher.add_handler(CommandHandler(["start", "help"], on_help, filters=Filters.chat_type.private))
 
-    dispatcher.add_handler(CallbackQueryHandler(on_match_button, pattern=r'^match'))
+    dispatcher.add_handler(CallbackQueryHandler(on_new_secret_santa_button, pattern=r'^newsanta$'))
+    dispatcher.add_handler(CallbackQueryHandler(on_match_button, pattern=r'^match$'))
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_group, pattern=r'^leave$'))
-    dispatcher.add_handler(CallbackQueryHandler(on_cancel_button, pattern=r'^cancel'))
-    dispatcher.add_handler(CallbackQueryHandler(on_revoke_button, pattern=r'^revoke'))
+    dispatcher.add_handler(CallbackQueryHandler(on_cancel_button, pattern=r'^cancel$'))
+    dispatcher.add_handler(CallbackQueryHandler(on_revoke_button, pattern=r'^revoke$'))
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_private, pattern=r'^private:leave:(-\d+)$'))
     dispatcher.add_handler(CallbackQueryHandler(on_update_name_button_private, pattern=r'^private:updatename:(-\d+)$'))
 
-    updater.job_queue.run_repeating(cleanup, interval=60*30, first=60)
+    updater.job_queue.run_repeating(cleanup, interval=Time.HOUR_1, first=Time.MINUTE_1)
 
     updater.bot.set_my_commands([])  # make sure the bot doesn't have any command set...
     updater.bot.set_my_commands(  # ...then set the scope for private chats
