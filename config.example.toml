@@ -3,9 +3,9 @@ token = ""
 workers = 1
 admins = []
 exit_unknown_groups = false # exit groups if not added by an user id in 'admins'
-log_chat = 0
+log_chat = 0 # chat where to post exceptions raised by callbacks (0 to disable)
 
 [santa]
 min_participants = 4
 max_participants = 30 # 0 for unlimited
-timeout = 72
+timeout = 72 # after how much to close secret santas, in hours
