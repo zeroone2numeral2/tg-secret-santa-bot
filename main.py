@@ -581,7 +581,7 @@ def on_leave_button_private(update: Update, context: CallbackContext, santa: Sec
     return santa
 
 
-@fail_with_message()
+@fail_with_message(answer_to_message=False)
 def on_new_group_chat(update: Update, _):
     logger.info("new group chat: %s", update.effective_chat.title)
 
