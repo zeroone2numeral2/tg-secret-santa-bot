@@ -443,6 +443,10 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
     text = f"Everyone has received their match in their <b>private chats</b>!"
     sent_message.edit_text(text)
 
+    if not config.santa.allow_revoke:
+        logger.debug("revoke ability is disabled: removing active secret santa from chat_data")
+        context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+
     santa.start()
     update_secret_santa_message(context, santa)
 
