@@ -56,6 +56,8 @@ updater = Updater(
     persistence=utilities.persistence_object()
 )
 
+BOT_LINK = f"https://t.me/{updater.bot.username}"
+
 
 class NewGroup(MessageFilter):
     def filter(self, message):
@@ -202,7 +204,8 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
     elif santa.started:
         participants_list = gen_participants_list(santa.participants)
 
-        base_text = '{santa} This Secret Santa has been started and everyone received their match!\n' \
+        base_text = '{santa} This Secret Santa has been started and everyone ' \
+                    '<a href="{bot_link}">received their match</a>!\n' \
                     'Participants list:\n\n' \
                     '{participants}'
 
@@ -211,6 +214,7 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
 
         text = base_text.format(
             santa=Emoji.SANTA,
+            bot_link=BOT_LINK,
             participants="\n".join(participants_list),
             creator=santa.creator_name_escaped,
         )
@@ -357,7 +361,7 @@ def on_join_command(update: Update, context: CallbackContext):
     reply_markup = keyboards.joined_message(santa_chat_id)
     sent_message = update.message.reply_html(
         f"{Emoji.TREE} You joined {santa.chat_title_escaped}'s {santa.inline_link('Secret Santa')}!\n"
-        f"{wait_for_start_text}. You will receive your match here, in your chat",
+        f"{wait_for_start_text}. You will receive your match here, in this chat",
         reply_markup=reply_markup
     )
 
@@ -395,7 +399,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
     logger.debug("start button: %d", update.effective_chat.id)
     if santa.creator_id != update.effective_user.id:
         update.callback_query.answer(
-            f"{Emoji.CROSS} Only {santa.creator_name} can use this button and start the Secret Santa",
+            f"{Emoji.CROSS} Only {santa.creator_name} can use this button and start the Secret Santa match",
             show_alert=True,
             cache_time=Time.DAY_3
         )
@@ -443,7 +447,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         match_message = context.bot.send_message(receiver_id, text)
         santa.set_user_match_message_id(receiver_id, match_message.message_id)
 
-    text = f"Everyone has received their match in their <b>private chats</b>!"
+    text = f"Everyone has received their match in their <a href=\"{BOT_LINK}\">private chats</a>!"
     sent_message.edit_text(text)
 
     if not config.santa.allow_revoke:
