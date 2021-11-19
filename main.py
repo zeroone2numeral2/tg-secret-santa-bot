@@ -526,9 +526,15 @@ def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[
         logger.debug("user is not admin nor the creator of the secret santa")
         return
 
-    context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+    text = "<i>This Secret Santa has been canceled by its creator or by an administrator</i>"
+    context.bot.edit_message_text(
+        chat_id=update.effective_chat.id,
+        message_id=santa.santa_message_id,
+        text=text,
+        reply_markup=None
+    )
 
-    update_secret_santa_message(context, santa)
+    context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
 
     context.bot.send_message(
         chat_id=update.effective_chat.id,
