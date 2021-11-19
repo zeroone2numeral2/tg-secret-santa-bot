@@ -399,7 +399,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         logger.debug("number of participants not even")
         update.callback_query.answer(
             f"{Emoji.CROSS} The number of participants must be even! Right now {santa.get_participants_count()} "
-            f"people have joined",
+            f"people have joined, you may ask another person to join {Emoji.SNOW}",
             show_alert=True
         )
         return
