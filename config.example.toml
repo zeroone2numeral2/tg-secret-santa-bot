@@ -10,4 +10,4 @@ min_participants = 4
 max_participants = 30 # 0 for unlimited
 timeout = 72 # after how much to close secret santas, in hours
 start_button_on_new_group = false
-allow_revoke = true # allow the secret santa creator to revoke already-sent matches
+allow_revoke = false # allow the secret santa creator to revoke already-sent matches

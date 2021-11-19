@@ -176,13 +176,16 @@ def get_secret_santa():
     return real_decorator
 
 
-def gen_participants_list(participants: dict):
+def gen_participants_list(participants: dict, join_by: Optional[str] = None):
     participants_list = []
     i = 1
     for participant_id, participant in participants.items():
         string = f'<b>{i}</b>. {utilities.mention_escaped_by_id(participant_id, participant["name"])}'
         participants_list.append(string)
         i += 1
+
+    if isinstance(join_by, str):
+        return join_by.join(participants_list)
 
     return participants_list
 
@@ -482,6 +485,12 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
         )
         return
 
+    return update.callback_query.answer(
+        f"{Emoji.WARN} The ability to revoke already-sent matches has been temporarily suspended",
+        show_alert=True,
+        cache_time=Time.DAY_1
+    )
+
     couldnt_notify = []
     text = f"{Emoji.WARN} <a href=\"{santa.link()}\">This Secret Santa</a> has been canceled by its creator. " \
            f"<b>Please ignore this match</b>, as it is no longer valid"
@@ -517,17 +526,16 @@ def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[
         logger.debug("user is not admin nor the creator of the secret santa")
         return
 
-    text = "<i>This Secret Santa has been canceled by its creator</i>"
-    context.bot.edit_message_text(
-        chat_id=update.effective_chat.id,
-        message_id=santa.santa_message_id,
-        text=text,
-        reply_markup=None
-    )
-
     context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
 
-    update.message.reply_html("<i>This chat's Secret Santa has ben canceled</i>")
+    update_secret_santa_message(context, santa)
+
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="<i>This chat's Secret Santa has ben canceled</i>",
+        reply_to_message_id=santa.santa_message_id,
+        allow_sending_without_reply=True,  # send the message anyway even if the secret santa message has been deleted
+    )
 
 
 def private_chat_button():
