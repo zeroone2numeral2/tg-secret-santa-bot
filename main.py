@@ -129,14 +129,14 @@ def fail_with_message(answer_to_message=True):
                 error_str = str(e)
                 logger.error('error while running callback: %s', error_str, exc_info=True)
 
-                error_str_message = f"Error during callback <code>{func.__name__}()</code> execution: <code>{error_str}</code>"
+                error_str_message = f"Error during callback <code>{func.__name__}()</code> execution: <code>{utilities.escape(error_str)}</code>"
                 if answer_to_message and update.message:
                     update.message.reply_html(error_str_message)
                 elif answer_to_message and update.callback_query:
                     update.effective_message.reply_html(error_str_message)
 
                 if config.telegram.log_chat:
-                    context.bot.send_message(config.telegram.log_chat, f"#santa_bot {error_str_message}")
+                    context.bot.send_message(config.telegram.log_chat, f"#{context.bot.username} {error_str_message}")
 
         return wrapped
     return real_decorator
@@ -151,9 +151,9 @@ def fail_with_message_job(func):
             error_str = str(e)
             logger.error('error while running job: %s', error_str, exc_info=True)
 
-            error_str_message = f"Error during job callback <code>{func.__name__}()</code> execution: <code>{error_str}</code>"
+            error_str_message = f"Error during job callback <code>{func.__name__}()</code> execution: <code>{utilities.escape(error_str)}</code>"
             if config.telegram.log_chat:
-                context.bot.send_message(config.telegram.log_chat, f"#santa_bot {error_str_message}")
+                context.bot.send_message(config.telegram.log_chat, f"#{context.bot.username} {error_str_message}")
 
     return wrapped
 
