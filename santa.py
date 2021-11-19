@@ -30,20 +30,22 @@ class SecretSanta:
             participants: Optional[dict] = None,
             created_on: Optional[datetime.datetime] = None,
             updated_on: Optional[datetime.datetime] = None,
-            started: bool = False
+            started: bool = False,
+            started_on: Optional[datetime.datetime] = None,
     ):
         now = utilities.now()
         self._santa_dict = {
             "origin_message_id": origin_message_id,  # message received from the user in the group
             "santa_message_id": santa_message_id,  # message we send in the group
-            "participants": participants if participants else {},
-            "created_on": created_on if created_on else now,
-            "updated_on": updated_on if updated_on else now,
+            "participants": participants or {},
+            "created_on": created_on or now,
+            "updated_on": updated_on or now,
             "user_id": user_id,
             "user_name": user_name,
             "chat_id": chat_id,
             "chat_title": chat_title,
-            "started": started
+            "started": started,
+            "started_on": started_on,
         }
 
     @classmethod
@@ -59,6 +61,7 @@ class SecretSanta:
             created_on=santa_dict["created_on"],
             updated_on=santa_dict["updated_on"],
             started=santa_dict["started"],
+            started_on=santa_dict.get("started_on", None),
         )
 
     def dict(self):
@@ -107,6 +110,14 @@ class SecretSanta:
     @started.setter
     def started(self, new_value):
         self._santa_dict["started"] = new_value
+
+    @property
+    def started_on(self):
+        return self._santa_dict["started_on"]
+
+    @started_on.setter
+    def started_on(self, new_value):
+        self._santa_dict["started_on"] = new_value
 
     @property
     def message_id(self):
@@ -174,6 +185,10 @@ class SecretSanta:
 
     def updated(self):
         self._santa_dict["updated_on"] = utilities.now()
+
+    def start(self):
+        self.started = True
+        self.started_on = utilities.now()
 
     def is_participant(self, user: Union[int, User]) -> bool:
         user_id = self.user_id(user)

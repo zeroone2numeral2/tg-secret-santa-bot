@@ -201,14 +201,17 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
 
         base_text = '{santa} This Secret Santa has been started and everyone received their match!\n' \
                     'Participants list:\n\n' \
-                    '{participants}\n\n' \
-                    '{creator} still has some time to cancel it'
+                    '{participants}'
+
+        if config.santa.allow_revoke:
+            base_text = base_text + "\n\n{creator} still has some time to cancel it"
+
         text = base_text.format(
             santa=Emoji.SANTA,
             participants="\n".join(participants_list),
             creator=santa.creator_name_escaped,
         )
-        reply_markup = keyboards.revoke()
+        reply_markup = keyboards.revoke() if config.santa.allow_revoke else None
     else:
         participants_list = gen_participants_list(santa.participants)
 
@@ -440,7 +443,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
     text = f"Everyone has received their match in their <b>private chats</b>!"
     sent_message.edit_text(text)
 
-    santa.started = True
+    santa.start()
     update_secret_santa_message(context, santa)
 
 
