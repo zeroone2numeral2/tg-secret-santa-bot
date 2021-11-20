@@ -765,7 +765,8 @@ def admin_ongoing_command(update: Update, context: CallbackContext):
         santa = SecretSanta.from_dict(chat_data[ACTIVE_SECRET_SANTA_KEY])
         participants_count += santa.get_participants_count()
 
-    update.message.reply_html(f"There are {santa_count} ongoing secret santas, with a total of {participants_count}")
+    update.message.reply_html(f"There are {santa_count} ongoing secret santas, "
+                              f"with a total of {participants_count} participants")
 
 
 def allowed(permission: Optional[bool]):
