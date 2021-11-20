@@ -11,7 +11,7 @@ import time
 from functools import wraps
 from pathlib import Path
 from random import choice
-from typing import List, Callable, Optional
+from typing import List, Callable, Optional, Union
 
 from telegram import Update, TelegramError, Chat, ParseMode, Bot, BotCommandScopeAllPrivateChats, BotCommand, User, \
     BotCommandScopeAllChatAdministrators, ChatAction, ChatMemberLeft, ChatMemberUpdated, ChatMemberMember
@@ -45,6 +45,12 @@ class Time:
     HOUR_1 = 60 * 60
     MINUTE_30 = 60 * 30
     MINUTE_1 = 60
+
+
+class Error:
+    SEND_MESSAGE_DISABLED = "have no rights to send a message"
+    REMOVED_FROM_GROUP = "bot was kicked from the group chat"
+    CANT_EDIT = "chat_write_forbidden"  # we receive this when we try to edit a message/answer a callback query but we are muted
 
 
 updater = Updater(
@@ -123,6 +129,35 @@ def users(func):
     return wrapped
 
 
+def bot_restricted_check():
+    def real_decorator(func):
+        @wraps(func)
+        def wrapped(update: Update, context: CallbackContext, *args, **kwargs):
+            if MUTED_KEY in context.chat_data:
+                logger.info("received an update from chat %d, but we are muted", update.effective_chat.id)
+                return
+
+            try:
+                return func(update, context, *args, **kwargs)
+            except (TelegramError, BadRequest) as e:
+                error_str = str(e).lower()
+                if Error.REMOVED_FROM_GROUP in error_str:
+                    # we shouldn't receive these ever since we handle my_chat_member updates
+                    logger.info("removed from chat chat %d: cleaning up", update.effective_chat.id)
+                    context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+                elif Error.SEND_MESSAGE_DISABLED in error_str or Error.CANT_EDIT in error_str:
+                    logger.info("can't send messages in chat %d: marking as muted", update.effective_chat.id)
+                    context.chat_data[MUTED_KEY] = True
+
+                    # can't edit messages if muted
+                    # cancel_because_cant_send_messages(context, santa)
+                else:
+                    raise e
+
+        return wrapped
+    return real_decorator
+
+
 def fail_with_message(answer_to_message=True):
     def real_decorator(func):
         @wraps(func)
@@ -192,6 +227,20 @@ def gen_participants_list(participants: dict, join_by: Optional[str] = None):
         return join_by.join(participants_list)
 
     return participants_list
+
+
+def cancel_because_cant_send_messages(context: CallbackContext, santa: SecretSanta):
+    text = "<i>This Secret Santa was canceled because I can't send messages in this group</i>"
+    if santa.get_participants_count():
+        participants_list = gen_participants_list(santa.participants, join_by="\n")
+        text = f"{text}\nParticipants:\n\n{participants_list}"
+
+    return context.bot.edit_message_text(
+        chat_id=santa.chat_id,
+        message_id=santa.santa_message_id,
+        text=text,
+        reply_markup=None
+    )
 
 
 def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
@@ -308,6 +357,7 @@ def create_new_secret_santa(update: Update, context: CallbackContext, santa: Opt
 
 
 @fail_with_message()
+@bot_restricted_check()
 @get_secret_santa()
 def on_new_secret_santa_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("/new from %d -> %d", update.effective_user.id, update.effective_chat.id)
@@ -316,11 +366,20 @@ def on_new_secret_santa_command(update: Update, context: CallbackContext, santa:
 
 
 @fail_with_message()
+@bot_restricted_check()
 @get_secret_santa()
 def on_new_secret_santa_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("new secret santa button from %d -> %d", update.effective_user.id, update.effective_chat.id)
 
     return create_new_secret_santa(update, context, santa)
+
+
+def find_key(dispatcher_user_data: dict, target_chat_id: int, key_to_find: Union[int, str]) -> bool:
+    for chat_data_chat_id, chat_data in dispatcher_user_data.items():
+        if chat_data_chat_id != target_chat_id:
+            continue
+
+        return key_to_find in chat_data
 
 
 def find_santa(dispatcher_user_data: dict, santa_chat_id: int):
@@ -340,6 +399,11 @@ def find_santa(dispatcher_user_data: dict, santa_chat_id: int):
 def on_join_command(update: Update, context: CallbackContext):
     santa_chat_id = int(context.matches[0].group(1))
     logger.debug("join command from %d: %d", update.effective_user.id, santa_chat_id)
+
+    if find_key(context.dispatcher.chat_data, santa_chat_id, MUTED_KEY):
+        update.message.reply_html(f"It looks like I can't send messages in that group. I can't let "
+                                  f"new participants join until I can send messages there, I'm sorry {Emoji.SAD}")
+        return
 
     santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
     if not santa:
@@ -373,6 +437,7 @@ def on_join_command(update: Update, context: CallbackContext):
 
 
 @fail_with_message(answer_to_message=False)
+@bot_restricted_check()
 @get_secret_santa()
 def on_leave_button_group(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("leave button in group: %d", update.effective_chat.id)
@@ -396,6 +461,7 @@ def on_leave_button_group(update: Update, context: CallbackContext, santa: Optio
 
 
 @fail_with_message(answer_to_message=False)
+@bot_restricted_check()
 @get_secret_santa()
 def on_match_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("start button: %d", update.effective_chat.id)
@@ -461,6 +527,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
 
 
 @fail_with_message(answer_to_message=False)
+@bot_restricted_check()
 @get_secret_santa()
 def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("cancel button: %d", update.effective_chat.id)
@@ -480,6 +547,7 @@ def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[S
 
 
 @fail_with_message(answer_to_message=False)
+@bot_restricted_check()
 @get_secret_santa()
 def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("revoke button: %d", update.effective_chat.id)
@@ -519,6 +587,7 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
 
 
 @fail_with_message(answer_to_message=False)
+@bot_restricted_check()
 @get_secret_santa()
 def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("/cancel command: %d", update.effective_chat.id)
@@ -577,7 +646,7 @@ def private_chat_button():
     return real_decorator
 
 
-@fail_with_message(answer_to_message=False)
+@fail_with_message(answer_to_message=True)
 @private_chat_button()
 def on_update_name_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("update name button in private: %d", update.effective_chat.id)
@@ -592,7 +661,7 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
     update_secret_santa_message(context, santa)
 
 
-@fail_with_message(answer_to_message=False)
+@fail_with_message(answer_to_message=True)
 @private_chat_button()
 def on_leave_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("leave button in private: %d", update.effective_chat.id)
@@ -690,12 +759,17 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
     if my_chat_member.new_chat_member.status == ChatMemberLeft:
         logger.debug("bot removed from %d, removing chat_data...", my_chat_member.chat.id)
         context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+        context.chat_data.pop(MUTED_KEY, None)
     elif was_muted(my_chat_member):
-        logger.debug("bot muted in %d, removing active secret santa...", my_chat_member.chat.id)
-        context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+        logger.debug("bot muted in %d", my_chat_member.chat.id)
         context.chat_data[MUTED_KEY] = True
 
-        # TODO: edit current secret santa message
+        # muted -> can't edit messages either
+        #
+        # if ongoing_secret_santa:
+        #     logger.debug("ongoing secret santa: editing message...")
+        #     santa = SecretSanta.from_dict(ongoing_secret_santa)
+        #     cancel_because_cant_send_messages(context, santa)
     elif was_unmuted(my_chat_member):
         logger.debug("bot unmuted in %d", my_chat_member.chat.id)
         context.chat_data.pop(MUTED_KEY, None)
