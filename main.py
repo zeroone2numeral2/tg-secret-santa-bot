@@ -14,10 +14,10 @@ from random import choice
 from typing import List, Callable, Optional
 
 from telegram import Update, TelegramError, Chat, ParseMode, Bot, BotCommandScopeAllPrivateChats, BotCommand, User, \
-    BotCommandScopeAllChatAdministrators, ChatAction
+    BotCommandScopeAllChatAdministrators, ChatAction, ChatMemberLeft, ChatMemberUpdated, ChatMemberMember
 from telegram.error import BadRequest
 from telegram.ext import Updater, CallbackContext, Filters, MessageHandler, CallbackQueryHandler, MessageFilter, \
-    CommandHandler, ExtBot, Defaults
+    CommandHandler, ExtBot, Defaults, ChatMemberHandler
 from telegram.utils.request import Request
 
 import keyboards
@@ -28,6 +28,8 @@ from mwt import MWT
 from config import config
 
 ACTIVE_SECRET_SANTA_KEY = "active_secret_santa"
+MUTED_KEY = "muted"
+BLOCKED_KEY = "blocked"
 
 EMPTY_SECRET_SANTA_STR = f'{Emoji.SANTA}{Emoji.TREE} Nobody joined this Secret Santa yet! Use the "<b>join</b>" button below to join'
 
@@ -643,6 +645,64 @@ def on_help(update: Update, _):
     update.message.reply_html(text)
 
 
+def allowed(permission: Optional[bool]):
+    if permission is None:
+        # None means it's enabled
+        return True
+
+    return permission
+
+
+def was_muted(chat_member_update: ChatMemberUpdated):
+    could_send_messages = allowed(chat_member_update.old_chat_member.can_send_messages)
+    can_send_messages = allowed(chat_member_update.new_chat_member.can_send_messages)
+    if could_send_messages and not can_send_messages:
+        return True
+    return False
+
+
+def was_unmuted(chat_member_update: ChatMemberUpdated):
+    could_send_messages = allowed(chat_member_update.old_chat_member.can_send_messages)
+    can_send_messages = allowed(chat_member_update.new_chat_member.can_send_messages)
+    if not could_send_messages and can_send_messages:
+        return True
+    return False
+
+
+@fail_with_message(answer_to_message=False)
+def on_my_chat_member_update(update: Update, context: CallbackContext):
+    logger.debug("my_chat_member update in %d", update.my_chat_member.chat.id)
+    my_chat_member = update.my_chat_member
+
+    if my_chat_member.chat.id > 0:
+        # status == ChatMemberLeft -> bot was blocked
+        # status == ChatMemberMember-> bot was unblocked
+        if my_chat_member.new_chat_member.status == ChatMemberLeft:
+            context.user_data[BLOCKED_KEY] = True
+        elif my_chat_member.new_chat_member.status == ChatMemberMember:
+            context.user_data.pop(BLOCKED_KEY, None)
+
+        return
+
+    # from pprint import pprint
+    # pprint(update.to_dict())
+
+    if my_chat_member.new_chat_member.status == ChatMemberLeft:
+        logger.debug("bot removed from %d, removing chat_data...", my_chat_member.chat.id)
+        context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+    elif was_muted(my_chat_member):
+        logger.debug("bot muted in %d, removing active secret santa...", my_chat_member.chat.id)
+        context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+        context.chat_data[MUTED_KEY] = True
+
+        # TODO: edit current secret santa message
+    elif was_unmuted(my_chat_member):
+        logger.debug("bot unmuted in %d", my_chat_member.chat.id)
+        context.chat_data.pop(MUTED_KEY, None)
+    else:
+        logger.debug("no relevant change happened")
+
+
 def secret_santa_expired(context: CallbackContext, santa: SecretSanta):
     if not santa.started:
         text = f"<i>This Secret Santa expired ({config.santa.timeout} hours has passed from its creation)</i>"
@@ -709,6 +769,8 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_private, pattern=r'^private:leave:(-\d+)$'))
     dispatcher.add_handler(CallbackQueryHandler(on_update_name_button_private, pattern=r'^private:updatename:(-\d+)$'))
 
+    dispatcher.add_handler(ChatMemberHandler(on_my_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
+
     updater.job_queue.run_repeating(cleanup, interval=Time.HOUR_1, first=Time.MINUTE_1)
 
     updater.bot.set_my_commands([])  # make sure the bot doesn't have any command set...
@@ -724,7 +786,7 @@ def main():
         scope=BotCommandScopeAllChatAdministrators()
     )
 
-    allowed_updates = ["message", "callback_query"]  # https://core.telegram.org/bots/api#getupdates
+    allowed_updates = ["message", "callback_query", "my_chat_member"]  # https://core.telegram.org/bots/api#getupdates
 
     logger.info("running as @%s, allowed updates: %s", updater.bot.username, allowed_updates)
     updater.start_polling(drop_pending_updates=True, allowed_updates=allowed_updates)
