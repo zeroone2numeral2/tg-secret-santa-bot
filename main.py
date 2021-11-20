@@ -370,7 +370,7 @@ def create_new_secret_santa(update: Update, context: CallbackContext, santa: Opt
 @bot_restricted_check()
 @get_secret_santa()
 def on_new_secret_santa_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("/new from %d -> %d", update.effective_user.id, update.effective_chat.id)
+    logger.info("/new from %d in chat %d", update.effective_user.id, update.effective_chat.id)
 
     return create_new_secret_santa(update, context, santa)
 
@@ -379,7 +379,7 @@ def on_new_secret_santa_command(update: Update, context: CallbackContext, santa:
 @bot_restricted_check()
 @get_secret_santa()
 def on_new_secret_santa_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("new secret santa button from %d -> %d", update.effective_user.id, update.effective_chat.id)
+    logger.info("new secret santa button from %d in chat %d", update.effective_user.id, update.effective_chat.id)
 
     return create_new_secret_santa(update, context, santa)
 
@@ -408,7 +408,7 @@ def find_santa(dispatcher_chat_data: dict, santa_chat_id: int):
 @fail_with_message()
 def on_join_command(update: Update, context: CallbackContext):
     santa_chat_id = int(context.matches[0].group(1))
-    logger.debug("join command from %d: %d", update.effective_user.id, santa_chat_id)
+    logger.info("join command from %d, chat id: %d", update.effective_user.id, santa_chat_id)
 
     if find_key(context.dispatcher.chat_data, santa_chat_id, MUTED_KEY):
         update.message.reply_html(f"It looks like I can't send messages in that group. I can't let "
@@ -660,11 +660,12 @@ def private_chat_button():
         @wraps(func)
         def wrapped(update: Update, context: CallbackContext, *args, **kwargs):
             santa_chat_id = int(context.matches[0].group(1))
-            logger.debug("chat_id: %d", santa_chat_id)
+            logger.debug("private chat button, chat_id: %d", santa_chat_id)
 
             santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
             if not santa:
-                # we do not edit or delete this message when a Secrt Santa is started, so we leave the button there
+                # we do not edit or delete this message when a Secrt Santa is started, so the buttons are still there
+                logger.debug("user tapped on a private chat button, but there is no active secret santa for that chat")
                 update.callback_query.answer(f"This chat's Secret Santa is no longer valid", show_alert=True)
                 update.callback_query.edit_message_reply_markup(reply_markup=None)
                 return
@@ -715,7 +716,7 @@ def on_leave_button_private(update: Update, context: CallbackContext, santa: Sec
 
 @fail_with_message(answer_to_message=False)
 def on_new_group_chat(update: Update, _):
-    logger.info("new group chat: %s", update.effective_chat.title)
+    logger.info("new group chat: %d", update.effective_chat.id)
 
     if config.telegram.exit_unknown_groups and update.effective_user.id not in config.telegram.admins:
         logger.info("unauthorized: leaving...")
