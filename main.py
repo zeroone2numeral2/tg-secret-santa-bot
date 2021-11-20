@@ -14,7 +14,8 @@ from random import choice
 from typing import List, Callable, Optional, Union
 
 from telegram import Update, TelegramError, Chat, ParseMode, Bot, BotCommandScopeAllPrivateChats, BotCommand, User, \
-    BotCommandScopeAllChatAdministrators, ChatAction, ChatMemberLeft, ChatMemberUpdated, ChatMemberMember
+    BotCommandScopeAllChatAdministrators, ChatAction, ChatMemberLeft, ChatMemberUpdated, ChatMemberMember, \
+    BotCommandScopeChatAdministrators
 from telegram.error import BadRequest
 from telegram.ext import Updater, CallbackContext, Filters, MessageHandler, CallbackQueryHandler, MessageFilter, \
     CommandHandler, ExtBot, Defaults, ChatMemberHandler
@@ -51,6 +52,15 @@ class Error:
     SEND_MESSAGE_DISABLED = "have no rights to send a message"
     REMOVED_FROM_GROUP = "bot was kicked from the group chat"
     CANT_EDIT = "chat_write_forbidden"  # we receive this when we try to edit a message/answer a callback query but we are muted
+
+
+class Commands:
+    PRIVATE = [BotCommand("help", "welcome message")]
+    GROUP_ADMINISTRATORS = [
+        BotCommand("newsanta", "create a new Secret Santa in this chat"),
+        BotCommand("cancel", "cancel any ongoing Secret Santa"),
+        BotCommand("hidecommands", "hide these commands"),
+    ]
 
 
 updater = Updater(
@@ -382,8 +392,8 @@ def find_key(dispatcher_user_data: dict, target_chat_id: int, key_to_find: Union
         return key_to_find in chat_data
 
 
-def find_santa(dispatcher_user_data: dict, santa_chat_id: int):
-    for chat_data_chat_id, chat_data in dispatcher_user_data.items():
+def find_santa(dispatcher_chat_data: dict, santa_chat_id: int):
+    for chat_data_chat_id, chat_data in dispatcher_chat_data.items():
         if chat_data_chat_id != santa_chat_id:
             continue
 
@@ -464,7 +474,7 @@ def on_leave_button_group(update: Update, context: CallbackContext, santa: Optio
 @bot_restricted_check()
 @get_secret_santa()
 def on_match_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("start button: %d", update.effective_chat.id)
+    logger.debug("start match button: %d", update.effective_chat.id)
     if santa.creator_id != update.effective_user.id:
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button and start the Secret Santa match",
@@ -584,6 +594,32 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
                f"You may want to notify them"
 
     update.callback_query.answer(text, show_alert=True)
+
+
+@fail_with_message(answer_to_message=False)
+@bot_restricted_check()
+def on_hide_commands_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("/hidecommands command: %d", update.effective_chat.id)
+
+    context.bot.set_my_commands(
+        commands=[],
+        scope=BotCommandScopeChatAdministrators(chat_id=update.effective_chat.id)
+    )
+    update.message.reply_html("Done. It might take some time for them to disappear. "
+                              "You can use <code>/showcommands</code> if you want the group admins to be able to "
+                              "see them again")
+
+
+@fail_with_message(answer_to_message=False)
+@bot_restricted_check()
+def on_show_commands_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
+    logger.debug("/showcommands command: %d", update.effective_chat.id)
+
+    context.bot.set_my_commands(
+        commands=Commands.GROUP_ADMINISTRATORS,
+        scope=BotCommandScopeChatAdministrators(chat_id=update.effective_chat.id)
+    )
+    update.message.reply_html("Done. It might take some time for them to appear")
 
 
 @fail_with_message(answer_to_message=False)
@@ -714,6 +750,24 @@ def on_help(update: Update, _):
     update.message.reply_html(text)
 
 
+@fail_with_message()
+@superadmin
+def admin_ongoing_command(update: Update, context: CallbackContext):
+    logger.info("/ongoing from %d", update.effective_user.id)
+
+    santa_count = 0
+    participants_count = 0
+    for chat_data_chat_id, chat_data in context.dispatcher.chat_data.items():
+        if ACTIVE_SECRET_SANTA_KEY not in chat_data:
+            continue
+
+        santa_count += 1
+        santa = SecretSanta.from_dict(chat_data[ACTIVE_SECRET_SANTA_KEY])
+        participants_count += santa.get_participants_count()
+
+    update.message.reply_html(f"There are {santa_count} ongoing secret santas, with a total of {participants_count}")
+
+
 def allowed(permission: Optional[bool]):
     if permission is None:
         # None means it's enabled
@@ -830,10 +884,14 @@ def main():
     new_group_filter = NewGroup()
     dispatcher.add_handler(MessageHandler(new_group_filter, on_new_group_chat))
 
+    dispatcher.add_handler(CommandHandler(["ongoing"], admin_ongoing_command, filters=Filters.chat_type.private))
+
     dispatcher.add_handler(CommandHandler(["new", "newsanta", "santa"], on_new_secret_santa_command, filters=Filters.chat_type.groups))
     dispatcher.add_handler(CommandHandler(["cancel"], on_cancel_command, filters=Filters.chat_type.groups))
     dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_command))
     dispatcher.add_handler(CommandHandler(["start", "help"], on_help, filters=Filters.chat_type.private))
+    dispatcher.add_handler(CommandHandler(["hidecommands"], on_hide_commands_command, filters=Filters.chat_type.groups))
+    dispatcher.add_handler(CommandHandler(["showcommands"], on_show_commands_command, filters=Filters.chat_type.groups))
 
     dispatcher.add_handler(CallbackQueryHandler(on_new_secret_santa_button, pattern=r'^newsanta$'))
     dispatcher.add_handler(CallbackQueryHandler(on_match_button, pattern=r'^match$'))
@@ -849,14 +907,11 @@ def main():
 
     updater.bot.set_my_commands([])  # make sure the bot doesn't have any command set...
     updater.bot.set_my_commands(  # ...then set the scope for private chats
-        [BotCommand("help", "welcome message")],
+        commands=Commands.PRIVATE,
         scope=BotCommandScopeAllPrivateChats()
     )
     updater.bot.set_my_commands(  # ...then set the scope for group administrators
-        [
-            BotCommand("newsanta", "create a new Secret Santa in this chat"),
-            BotCommand("cancel", "cancel any ongoing Secret Santa")
-        ],
+        commands=Commands.GROUP_ADMINISTRATORS,
         scope=BotCommandScopeAllChatAdministrators()
     )
 
