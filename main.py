@@ -689,13 +689,18 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
     logger.debug("update name button in private: %d", update.effective_chat.id)
 
     name = update.effective_user.first_name
-    santa.set_user_name(update.effective_user, name)
+    name_updated = False
+
+    if name != santa.get_user_name(update.effective_user):
+        santa.set_user_name(update.effective_user, name)
+        name_updated = True
 
     update.callback_query.answer(f"Your name has been updated to: {name}\n\nThis option allows you to change your "
                                  f"Telegram name and update it in the list (helpful if there are participants with "
                                  f"similar names)", show_alert=True)
 
-    update_secret_santa_message(context, santa)
+    if name_updated:
+        update_secret_santa_message(context, santa)
 
 
 @fail_with_message(answer_to_message=True)
@@ -900,6 +905,7 @@ def main():
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_group, pattern=r'^leave$'))
     dispatcher.add_handler(CallbackQueryHandler(on_cancel_button, pattern=r'^cancel$'))
     dispatcher.add_handler(CallbackQueryHandler(on_revoke_button, pattern=r'^revoke$'))
+
     dispatcher.add_handler(CallbackQueryHandler(on_leave_button_private, pattern=r'^private:leave:(-\d+)$'))
     dispatcher.add_handler(CallbackQueryHandler(on_update_name_button_private, pattern=r'^private:updatename:(-\d+)$'))
 
