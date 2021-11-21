@@ -90,6 +90,57 @@ def draft(items_list: list):
     logger = logging.getLogger("draft")
 
     items_list.sort()
+
+    retry_raffle = True
+    while retry_raffle:
+        retry_raffle = False  # we will set it to true if there's an issue while creating pairs
+
+        result_pairs = []
+        yet_to_match = items_list[:]
+        invalid_picks_count = 0
+        invalid_picks_threshold = 300
+
+        for i, item in enumerate(items_list):
+            logger.debug(f"trying to match: {item}")
+
+            picked_item = random.choice(yet_to_match)
+
+            if picked_item == item and len(yet_to_match) == 1:
+                # there is just one item left to match, but the only left item is the item itself
+                # the raffle should be invalidated and we should repeat it
+                logger.warning("the only item left to match is the item we are trying to match")
+                retry_raffle = True
+                break
+            elif invalid_picks_count > invalid_picks_threshold:
+                # sometimes the bot ends in a loop, we need to figure out why
+                logger.warning(f"the number of invalid attempts is higher than {invalid_picks_threshold}")
+                retry_raffle = True
+                break
+
+            while item == picked_item:
+                logger.debug(f"invalid match {item} -> {picked_item}: item can't be matched with itself, trying again...")
+                invalid_picks_count += 1
+                picked_item = random.choice(yet_to_match)
+
+            yet_to_match.remove(picked_item)
+
+            result_pairs.append((item, picked_item))
+
+            yet_to_match_str = ', '.join([f"{i}" for i in yet_to_match])
+            logger.debug(f"valid match: {item} -> {picked_item}, yet to match: {yet_to_match_str}")
+
+        if not retry_raffle:
+            logger.debug("draft concluded with success")
+            return result_pairs
+        else:
+            logger.warning("draft needs to be repeated!")
+
+
+def draft_old(items_list: list):
+    # logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
+    logger = logging.getLogger("draft")
+
+    items_list.sort()
     number_of_items = len(items_list)
 
     retry_raffle = True
@@ -136,7 +187,7 @@ def draft(items_list: list):
             logger.debug(f"valid match: {item} -> {picked_item}, yet to match: {yet_to_match_str}")
 
         if not retry_raffle:
-            logger.debug("draft concluded without issues")
+            logger.debug("draft concluded with success")
             return result_pairs
         else:
             logger.warning("draft needs to be repeated!")
