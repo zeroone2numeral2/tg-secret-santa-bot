@@ -98,7 +98,9 @@ def draft(items_list: list):
         
         result_pairs = []
         already_matched_to_someone = []
-        
+        invalid_picks_count = 0
+        invalid_picks_threshold = 300
+
         for i, item in enumerate(items_list):
             picked_item = random.choice(items_list)
             
@@ -108,9 +110,19 @@ def draft(items_list: list):
                 logger.warning("the only item left to match is the item we are trying to match")
                 retry_raffle = True
                 break
+            elif invalid_picks_count > invalid_picks_threshold:
+                # sometimes the bot ends in a loop, we need to figure this out
+                logger.warning(f"the number of invalid attempts is higher than {invalid_picks_threshold}")
+                retry_raffle = True
+                break
 
             while item == picked_item or picked_item in already_matched_to_someone:
-                logger.debug(f"{picked_item} is invalid, trying again...")
+                if item == picked_item:
+                    logger.debug(f"{picked_item} can't be matched with itself, trying again...")
+                elif picked_item in already_matched_to_someone:
+                    logger.debug(f"{picked_item} as already matched to someone else, trying again...")
+
+                invalid_picks_count += 1
                 picked_item = random.choice(items_list)
 
             result_pairs.append((item, picked_item))
@@ -125,7 +137,7 @@ def draft(items_list: list):
             logger.debug("draft concluded without issues")
             return result_pairs
         else:
-            logger.warning("draft needs to be repeated")
+            logger.warning("draft needs to be repeated!")
 
 
 def persistence_object(file_path='persistence/data.pickle'):
