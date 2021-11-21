@@ -52,6 +52,7 @@ class Error:
     SEND_MESSAGE_DISABLED = "have no rights to send a message"
     REMOVED_FROM_GROUP = "bot was kicked from the group chat"
     CANT_EDIT = "chat_write_forbidden"  # we receive this when we try to edit a message/answer a callback query but we are muted
+    MESSAGE_TO_EDIT_NOT_FOUND = "message to edit not found"
 
 
 class Commands:
@@ -627,15 +628,19 @@ def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[
         logger.debug("user is not admin nor the creator of the secret santa")
         return
 
-    text = "<i>This Secret Santa has been canceled by its creator or by an administrator</i>"
-    context.bot.edit_message_text(
-        chat_id=update.effective_chat.id,
-        message_id=santa.santa_message_id,
-        text=text,
-        reply_markup=None
-    )
-
     context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+
+    try:
+        context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=santa.santa_message_id,
+            text="<i>This Secret Santa has been canceled by its creator or by an administrator</i>",
+            reply_markup=None
+        )
+    except (TelegramError, BadRequest) as e:
+        logger.warning("error while editing canceled secret santa message: %s", str(e))
+        if Error.MESSAGE_TO_EDIT_NOT_FOUND not in str(e).lower():
+            raise e
 
     context.bot.send_message(
         chat_id=update.effective_chat.id,
