@@ -86,39 +86,46 @@ def safe_delete_by_id(bot: Bot, chat_id: int, message_id: int, log_error=True):
 
 
 def draft(items_list: list):
+    # logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
     logger = logging.getLogger("draft")
 
-    yet_to_match = [i for i in items_list]
+    items_list.sort()
+    number_of_items = len(items_list)
 
-    random.shuffle(items_list)
-    random.shuffle(yet_to_match)
+    retry_raffle = True
+    while retry_raffle:
+        retry_raffle = False  # we will set it to true if there's an issue while creating pairs
+        
+        result_pairs = []
+        already_matched_to_someone = []
+        
+        for i, item in enumerate(items_list):
+            picked_item = random.choice(items_list)
+            
+            if picked_item == item and i + 1 == number_of_items:
+                # there is just one item left to match, but the only left item is the item itself
+                # the raffle should be invalidated and we should repeat it
+                logger.warning("the only item left to match is the item we are trying to match")
+                retry_raffle = True
+                break
 
-    result_pairs = []
-    for item in items_list:
-        if item not in yet_to_match:
-            # we already matched it
-            continue
+            while item == picked_item or picked_item in already_matched_to_someone:
+                logger.debug(f"{picked_item} is invalid, trying again...")
+                picked_item = random.choice(items_list)
 
-        picked_item = yet_to_match[0]
-        while item == picked_item:
-            random.shuffle(yet_to_match)
-            picked_item = yet_to_match[0]
+            result_pairs.append((item, picked_item))
 
-        result_pairs.append((item, picked_item))
-        result_pairs.append((picked_item, item))
+            already_matched_to_someone.append(picked_item)
 
-        logger.debug(f"matched {picked_item} and {item}")
+            yet_to_match = list(set(items_list) - set(already_matched_to_someone))
+            yet_to_match_str = ', '.join([f"{i}" for i in sorted(yet_to_match)])
+            logger.debug(f"matched {item} and {picked_item}, yet to match: {yet_to_match_str}")
 
-        yet_to_match.remove(item)
-        yet_to_match.remove(picked_item)
-
-        yet_to_match_str = ', '.join([f"{i}" for i in sorted(yet_to_match)])
-        logger.debug(f"matched {item} and {picked_item}, remaining: {yet_to_match_str}")
-
-        if not yet_to_match:
-            break
-
-    return result_pairs
+        if not retry_raffle:
+            logger.debug("draft concluded without issues")
+            return result_pairs
+        else:
+            logger.warning("draft needs to be repeated")
 
 
 def persistence_object(file_path='persistence/data.pickle'):
@@ -143,5 +150,5 @@ def persistence_object(file_path='persistence/data.pickle'):
 
 
 if __name__ == "__main__":
-    draft(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"])
+    draft(["a", "b", "c", "d", "e", "f"])
 

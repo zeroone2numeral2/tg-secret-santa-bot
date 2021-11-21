@@ -483,15 +483,6 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         )
         return
 
-    if santa.get_participants_count() % 2 != 0:
-        logger.debug("number of participants not even")
-        update.callback_query.answer(
-            f"{Emoji.CROSS} The number of participants must be even! Right now {santa.get_participants_count()} "
-            f"people have joined, you may ask another person to join {Emoji.SNOW}",
-            show_alert=True
-        )
-        return
-
     sent_message = update.effective_message.reply_html(f'{Emoji.HOURGLASS} <i>Matching users...</i>')
 
     blocked_by = []
