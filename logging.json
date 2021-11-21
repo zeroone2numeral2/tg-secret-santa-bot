@@ -31,6 +31,9 @@
         },
         "apscheduler": {
             "level": "WARNING"
+        },
+        "mwt": {
+            "level": "WARNING"
         }
     },
     "formatters": {
