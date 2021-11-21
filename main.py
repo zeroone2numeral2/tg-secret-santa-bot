@@ -510,8 +510,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         match_name = santa.get_user_name(match_id)
         match_mention = utilities.mention_escaped_by_id(match_id, match_name)
 
-        text = f"{Emoji.SANTA}{Emoji.PRESENT} Your <a href=\"{santa.link()}\">Secret Santa</a> match is " \
-               f"{match_mention}!"
+        text = f"{Emoji.SANTA}{Emoji.PRESENT} You are {match_mention}'s <a href=\"{santa.link()}\">Secret Santa</a>!"
 
         match_message = context.bot.send_message(receiver_id, text)
         santa.set_user_match_message_id(receiver_id, match_message.message_id)
