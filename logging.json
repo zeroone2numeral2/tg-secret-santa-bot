@@ -14,7 +14,7 @@
             "encoding": "utf8",
             "maxBytes": 1048576,
             "filename": "logs/bot.log",
-            "backupCount": 5
+            "backupCount": 500
         }
     },
     "loggers": {
