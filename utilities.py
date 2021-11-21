@@ -102,6 +102,8 @@ def draft(items_list: list):
         invalid_picks_threshold = 300
 
         for i, item in enumerate(items_list):
+            logger.debug(f"trying to match: {item}")
+
             picked_item = random.choice(items_list)
             
             if picked_item == item and i + 1 == number_of_items:
@@ -118,9 +120,9 @@ def draft(items_list: list):
 
             while item == picked_item or picked_item in already_matched_to_someone:
                 if item == picked_item:
-                    logger.debug(f"{picked_item} can't be matched with itself, trying again...")
+                    logger.debug(f"invalid match {item} -> {picked_item}: item can't be matched with itself, trying again...")
                 elif picked_item in already_matched_to_someone:
-                    logger.debug(f"{picked_item} as already matched to someone else, trying again...")
+                    logger.debug(f"invalid match {item} -> {picked_item}: item is already matched to someone else, trying again...")
 
                 invalid_picks_count += 1
                 picked_item = random.choice(items_list)
@@ -131,7 +133,7 @@ def draft(items_list: list):
 
             yet_to_match = list(set(items_list) - set(already_matched_to_someone))
             yet_to_match_str = ', '.join([f"{i}" for i in sorted(yet_to_match)])
-            logger.debug(f"matched {item} and {picked_item}, yet to match: {yet_to_match_str}")
+            logger.debug(f"valid match: {item} -> {picked_item}, yet to match: {yet_to_match_str}")
 
         if not retry_raffle:
             logger.debug("draft concluded without issues")
