@@ -722,13 +722,17 @@ def on_leave_button_private(update: Update, context: CallbackContext, santa: Sec
 
 
 @fail_with_message(answer_to_message=False)
-def on_new_group_chat(update: Update, _):
+def on_new_group_chat(update: Update, context: CallbackContext):
     logger.info("new group chat: %d", update.effective_chat.id)
 
     if config.telegram.exit_unknown_groups and update.effective_user.id not in config.telegram.admins:
         logger.info("unauthorized: leaving...")
         update.effective_chat.leave()
         return
+
+    if RECENTLY_LEFT_KEY in context.bot_data:
+        logger.debug("removing group from recently left groups list...")
+        context.bot_data[RECENTLY_LEFT_KEY].pop(update.effective_chat.id, None)
 
     if not config.santa.start_button_on_new_group:
         return
@@ -893,8 +897,7 @@ def cleanup(context: CallbackContext):
 def main():
     dispatcher = updater.dispatcher
 
-    new_group_filter = NewGroup()
-    dispatcher.add_handler(MessageHandler(new_group_filter, on_new_group_chat))
+    dispatcher.add_handler(MessageHandler(NewGroup(), on_new_group_chat))
 
     dispatcher.add_handler(CommandHandler(["ongoing"], admin_ongoing_command, filters=Filters.chat_type.private))
 
