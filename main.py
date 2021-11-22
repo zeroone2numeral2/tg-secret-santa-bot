@@ -408,9 +408,9 @@ def find_santa(dispatcher_chat_data: dict, santa_chat_id: int):
 
 
 @fail_with_message()
-def on_join_command(update: Update, context: CallbackContext):
+def on_join_deeplink(update: Update, context: CallbackContext):
     santa_chat_id = int(context.matches[0].group(1))
-    logger.info("join command from %d, chat id: %d", update.effective_user.id, santa_chat_id)
+    logger.info("join deeplink from %d, chat id: %d", update.effective_user.id, santa_chat_id)
 
     if find_key(context.dispatcher.chat_data, santa_chat_id, MUTED_KEY):
         update.message.reply_html(f"It looks like I can't send messages in that group. I can't let "
@@ -926,10 +926,11 @@ def main():
 
     dispatcher.add_handler(CommandHandler(["ongoing"], admin_ongoing_command, filters=Filters.chat_type.private))
 
+    dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_deeplink))
+    dispatcher.add_handler(CommandHandler(["start", "help"], on_help, filters=Filters.chat_type.private))
+
     dispatcher.add_handler(CommandHandler(["new", "newsanta", "santa"], on_new_secret_santa_command, filters=Filters.chat_type.groups))
     dispatcher.add_handler(CommandHandler(["cancel"], on_cancel_command, filters=Filters.chat_type.groups))
-    dispatcher.add_handler(MessageHandler(Filters.chat_type.private & Filters.regex(r"^/start (-?\d+)"), on_join_command))
-    dispatcher.add_handler(CommandHandler(["start", "help"], on_help, filters=Filters.chat_type.private))
     dispatcher.add_handler(CommandHandler(["hidecommands"], on_hide_commands_command, filters=Filters.chat_type.groups))
     dispatcher.add_handler(CommandHandler(["showcommands"], on_show_commands_command, filters=Filters.chat_type.groups))
 
