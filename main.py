@@ -15,7 +15,7 @@ from typing import List, Callable, Optional, Union
 
 from telegram import Update, TelegramError, Chat, ParseMode, Bot, BotCommandScopeAllPrivateChats, BotCommand, User, \
     BotCommandScopeAllChatAdministrators, ChatAction, ChatMemberLeft, ChatMemberUpdated, ChatMemberMember, \
-    BotCommandScopeChatAdministrators
+    BotCommandScopeChatAdministrators, ChatMember
 from telegram.error import BadRequest
 from telegram.ext import Updater, CallbackContext, Filters, MessageHandler, CallbackQueryHandler, MessageFilter, \
     CommandHandler, ExtBot, Defaults, ChatMemberHandler
@@ -31,6 +31,7 @@ from config import config
 ACTIVE_SECRET_SANTA_KEY = "active_secret_santa"
 MUTED_KEY = "muted"
 BLOCKED_KEY = "blocked"
+RECENTLY_LEFT_KEY = "recently_left"
 
 EMPTY_SECRET_SANTA_STR = f'{Emoji.SANTA}{Emoji.TREE} Nobody joined this Secret Santa yet! Use the "<b>join</b>" button below to join'
 
@@ -50,7 +51,7 @@ class Time:
 
 class Error:
     SEND_MESSAGE_DISABLED = "have no rights to send a message"
-    REMOVED_FROM_GROUP = "bot was kicked from the group chat"
+    REMOVED_FROM_GROUP = "bot was kicked from the"  # it might continue with "group chat" or "supergroup chat"
     CANT_EDIT = "chat_write_forbidden"  # we receive this when we try to edit a message/answer a callback query but we are muted
     MESSAGE_TO_EDIT_NOT_FOUND = "message to edit not found"
 
@@ -802,9 +803,9 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
     if my_chat_member.chat.id > 0:
         # status == ChatMemberLeft -> bot was blocked
         # status == ChatMemberMember-> bot was unblocked
-        if my_chat_member.new_chat_member.status == ChatMemberLeft:
+        if my_chat_member.new_chat_member.status == ChatMember.LEFT:
             context.user_data[BLOCKED_KEY] = True
-        elif my_chat_member.new_chat_member.status == ChatMemberMember:
+        elif my_chat_member.new_chat_member.status == ChatMember.MEMBER:
             context.user_data.pop(BLOCKED_KEY, None)
 
         return
@@ -812,10 +813,13 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
     # from pprint import pprint
     # pprint(update.to_dict())
 
-    if my_chat_member.new_chat_member.status == ChatMemberLeft:
+    if my_chat_member.new_chat_member.status == ChatMember.LEFT:
         logger.debug("bot removed from %d, removing chat_data...", my_chat_member.chat.id)
         context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
         context.chat_data.pop(MUTED_KEY, None)
+        if RECENTLY_LEFT_KEY not in context.bot_data:
+            context.bot_data[RECENTLY_LEFT_KEY] = {}
+        context.bot_data[RECENTLY_LEFT_KEY][my_chat_member.chat.id] = utilities.now()
     elif was_muted(my_chat_member):
         logger.debug("bot muted in %d", my_chat_member.chat.id)
         context.chat_data[MUTED_KEY] = True
@@ -830,7 +834,7 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
         logger.debug("bot unmuted in %d", my_chat_member.chat.id)
         context.chat_data.pop(MUTED_KEY, None)
     else:
-        logger.debug("no relevant change happened")
+        logger.debug("no relevant change happened: %s", my_chat_member)
 
 
 def secret_santa_expired(context: CallbackContext, santa: SecretSanta):
