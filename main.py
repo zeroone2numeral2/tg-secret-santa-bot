@@ -513,7 +513,29 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         sent_message.edit_text(text)
         return
 
-    matches = utilities.draft(list(santa.participants.keys()))
+    matches = []
+    max_attempts = 12
+    failed_attempts = 0
+    while failed_attempts < max_attempts:
+        try:
+            matches = utilities.draft(list(santa.participants.keys()))
+            break
+        except (utilities.TooManyInvalidPicks, utilities.StuckOnLastItem) as e:
+            failed_attempts += 1
+            logger.warning("drafting pairs error: %s (failed attempt %d/%d)", str(e), failed_attempts, max_attempts)
+
+    if not matches:
+        logger.error("match list still empty (failed attempts: %d/%d)", failed_attempts, max_attempts)
+
+        utilities.log_tg(context.bot, f"#drafting_error while generating pairs for chat {update.effective_chat.id}")
+
+        text = f"{Emoji.WARN} <i>{update.effective_user.mention_html()}, " \
+               f"something went wrong during the Secret Santa draw. Please try again</i>"
+        sent_message.edit_text(text)
+        return
+
+    logger.debug("gathered pairs matches, failed attempts: %d", failed_attempts)
+
     for receiver_id, match_id in matches:
         match_name = santa.get_user_name(match_id)
         match_mention = utilities.mention_escaped_by_id(match_id, match_name)

@@ -5,13 +5,15 @@ import pickle
 import random
 import re
 from html import escape
+from typing import Union, List
 
 # noinspection PyPackageRequirements
-from typing import Union
-
 from telegram import Message, User, Bot, Chat
 # noinspection PyPackageRequirements
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import PicklePersistence
+
+from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -85,55 +87,65 @@ def safe_delete_by_id(bot: Bot, chat_id: int, message_id: int, log_error=True):
         return False
 
 
-def draft(items_list: list):
+def log_tg(bot: Bot, text: str):
+    if not config.telegram.log_chat:
+        logger.debug("can't log to Telegram: no log chat configured")
+        return
+
+    text = f"#{bot.username} warning: {text}"
+
+    try:
+        bot.send_message(config.telegram.log_chat, text)
+    except (BadRequest, TelegramError) as e:
+        logger.warning("exception while logging message to chat %d: %s", config.telegram.log_chat, str(e))
+        logger.debug("trying again with parse_mode disabled...")
+        bot.send_message(config.telegram.log_chat, text, parse_mode=None)
+
+
+class TooManyInvalidPicks(Exception):
+    pass
+
+
+class StuckOnLastItem(Exception):
+    pass
+
+
+def draft(items_list: list, max_invalid_picks: int = 300):
     # logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
     logger = logging.getLogger("draft")
 
     items_list.sort()
 
-    retry_raffle = True
-    while retry_raffle:
-        retry_raffle = False  # we will set it to true if there's an issue while creating pairs
+    result_pairs = []
+    yet_to_match = items_list[:]
+    invalid_picks_count = 0
 
-        result_pairs = []
-        yet_to_match = items_list[:]
-        invalid_picks_count = 0
-        invalid_picks_threshold = 300
+    for i, item in enumerate(items_list):
+        logger.debug(f"trying to match: {item}")
 
-        for i, item in enumerate(items_list):
-            logger.debug(f"trying to match: {item}")
+        picked_item = random.choice(yet_to_match)
 
+        if picked_item == item and len(yet_to_match) == 1:
+            # there is just one item left to match, but the only left item is the item itself
+            # the raffle should be invalidated and we should repeat it
+            raise StuckOnLastItem("the only item left to match is the item we are trying to match")
+        elif invalid_picks_count > max_invalid_picks:
+            # sometimes the bot ends in a loop, we need to figure out why
+            raise TooManyInvalidPicks(f"the number of invalid picks is higher than {max_invalid_picks}")
+
+        while item == picked_item:
+            logger.debug(f"invalid match {item} -> {picked_item}: item can't be matched with itself, trying again...")
+            invalid_picks_count += 1
             picked_item = random.choice(yet_to_match)
 
-            if picked_item == item and len(yet_to_match) == 1:
-                # there is just one item left to match, but the only left item is the item itself
-                # the raffle should be invalidated and we should repeat it
-                logger.warning("the only item left to match is the item we are trying to match")
-                retry_raffle = True
-                break
-            elif invalid_picks_count > invalid_picks_threshold:
-                # sometimes the bot ends in a loop, we need to figure out why
-                logger.warning(f"the number of invalid attempts is higher than {invalid_picks_threshold}")
-                retry_raffle = True
-                break
+        yet_to_match.remove(picked_item)
 
-            while item == picked_item:
-                logger.debug(f"invalid match {item} -> {picked_item}: item can't be matched with itself, trying again...")
-                invalid_picks_count += 1
-                picked_item = random.choice(yet_to_match)
+        result_pairs.append((item, picked_item))
 
-            yet_to_match.remove(picked_item)
+        yet_to_match_str = ', '.join([f"{i}" for i in yet_to_match])
+        logger.debug(f"valid match: {item} -> {picked_item}, yet to match: {yet_to_match_str}")
 
-            result_pairs.append((item, picked_item))
-
-            yet_to_match_str = ', '.join([f"{i}" for i in yet_to_match])
-            logger.debug(f"valid match: {item} -> {picked_item}, yet to match: {yet_to_match_str}")
-
-        if not retry_raffle:
-            logger.debug("draft concluded with success")
-            return result_pairs
-        else:
-            logger.warning("draft needs to be repeated!")
+    return result_pairs
 
 
 def draft_old(items_list: list):
