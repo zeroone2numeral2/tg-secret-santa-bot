@@ -421,7 +421,11 @@ def on_join_command(update: Update, context: CallbackContext):
     if not santa:
         # this might happen if the bot was removed from the group: the "join" button is still there
         # we should check if the chat is in the recently left chats in context.bot_data
-        raise ValueError(f"user tried to join, but no secret santa is active in {santa_chat_id}")
+        if RECENTLY_LEFT_KEY in context.bot_data and santa_chat_id in context.bot_data[RECENTLY_LEFT_KEY]:
+            update.message.reply_html(f"It looks like I've been removed from this Secret Santa's group {Emoji.SAD}")
+            return
+        else:
+            raise ValueError(f"user tried to join, but no secret santa is active in {santa_chat_id}")
 
     if config.santa.max_participants and santa.get_participants_count() >= config.santa.max_participants:
         text = f"I'm sorry, unfortunately {santa.inline_link('this Secret Santa')} has already reached the " \
