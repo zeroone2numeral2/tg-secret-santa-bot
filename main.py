@@ -884,6 +884,7 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
     # pprint(update.to_dict())
 
     if my_chat_member.new_chat_member.status == ChatMember.LEFT:
+        # we receive this kind of update also when the group is deleted
         logger.debug("bot removed from %d, removing chat_data...", my_chat_member.chat.id)
         context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
         context.chat_data.pop(MUTED_KEY, None)
