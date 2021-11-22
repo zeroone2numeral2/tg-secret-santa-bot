@@ -872,8 +872,8 @@ def secret_santa_expired(context: CallbackContext, santa: SecretSanta):
 
 
 @fail_with_message_job
-def cleanup(context: CallbackContext):
-    logger.info("cleanup job...")
+def close_old_secret_santas(context: CallbackContext):
+    logger.info("inactive secret santa job...")
 
     for chat_id, chat_data in context.dispatcher.chat_data.items():
         if ACTIVE_SECRET_SANTA_KEY not in chat_data:
@@ -881,9 +881,9 @@ def cleanup(context: CallbackContext):
 
         santa = SecretSanta.from_dict(chat_data[ACTIVE_SECRET_SANTA_KEY])
 
-        now = utilities.now_utc()
+        now = utilities.now()
         diff_seconds = (now - santa.created_on).total_seconds()
-        if diff_seconds <= config.santa.timeout * 3600:
+        if diff_seconds <= config.santa.timeout * Time.HOUR_1:
             continue
 
         secret_santa_expired(context, santa)
@@ -892,6 +892,31 @@ def cleanup(context: CallbackContext):
         chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
 
     logger.info("...cleanup job end")
+
+
+@fail_with_message_job
+def left_chats_cleanup(context: CallbackContext):
+    logger.info("executing job...")
+
+    if RECENTLY_LEFT_KEY not in context.bot_data:
+        logger.info("...job execution end")
+        return
+
+    chat_ids_to_pop = []
+    for chat_id, left_dt in context.dispatcher.bot_data[RECENTLY_LEFT_KEY].items():
+        now = utilities.now()
+        diff_seconds = (now - left_dt).total_seconds()
+        if diff_seconds <= Time.WEEK_4:
+            continue
+
+        chat_ids_to_pop.append(chat_id)
+
+    logger.debug("%d chats to pop", len(chat_ids_to_pop))
+    for chat_id in chat_ids_to_pop:
+        logger.debug("popping chat %d from recently left chats dict", chat_id)
+        context.dispatcher.bot_data[RECENTLY_LEFT_KEY].pop(chat_id, None)
+
+    logger.info("...job execution end")
 
 
 def main():
@@ -919,7 +944,8 @@ def main():
 
     dispatcher.add_handler(ChatMemberHandler(on_my_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
 
-    updater.job_queue.run_repeating(cleanup, interval=Time.HOUR_1, first=Time.MINUTE_1)
+    updater.job_queue.run_repeating(close_old_secret_santas, interval=Time.HOUR_1, first=Time.MINUTE_1)
+    updater.job_queue.run_repeating(left_chats_cleanup, interval=Time.DAY_1, first=Time.HOUR_6)
 
     updater.bot.set_my_commands([])  # make sure the bot doesn't have any command set...
     updater.bot.set_my_commands(  # ...then set the scope for private chats
