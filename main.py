@@ -608,26 +608,6 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
         cache_time=Time.DAY_1
     )
 
-    couldnt_notify = []
-    text = f"{Emoji.WARN} <a href=\"{santa.link()}\">This Secret Santa</a> has been canceled by its creator. " \
-           f"<b>Please ignore this match</b>, as it is no longer valid"
-    for user_id, user_data in santa.participants.items():
-        try:
-            context.bot.send_message(user_id, text, reply_to_message_id=user_data["match_message_id"])
-        except (BadRequest, TelegramError) as e:
-            logger.error("could not send revoke notification to %d: %s", user_id, str(e))
-            couldnt_notify.append(user_data["name"])
-
-    santa.started = False
-    update_secret_santa_message(context, santa)
-
-    text = f"Participants have been notified, Secret Santa re-opened"
-    if couldnt_notify:
-        text = f"{text}. However, I've not been able to message {', '.join(couldnt_notify)}. " \
-               f"You may want to notify them"
-
-    update.callback_query.answer(text, show_alert=True)
-
 
 @fail_with_message(answer_to_message=False)
 @bot_restricted_check()
