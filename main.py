@@ -272,16 +272,13 @@ def update_secret_santa_message(context: CallbackContext, santa: SecretSanta):
                     'Participants list:\n\n' \
                     '{participants}'
 
-        if config.santa.allow_revoke:
-            base_text = base_text + "\n\n{creator} still has some time to cancel it"
-
         text = base_text.format(
             santa=Emoji.SANTA,
             bot_link=BOT_LINK,
             participants="\n".join(participants_list),
             creator=santa.creator_name_escaped,
         )
-        reply_markup = keyboards.revoke() if config.santa.allow_revoke else None
+        reply_markup = None
     else:
         participants_list = gen_participants_list(santa.participants)
 
@@ -545,12 +542,11 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         match_message = context.bot.send_message(receiver_id, text)
         santa.set_user_match_message_id(receiver_id, match_message.message_id)
 
+    logger.debug("removing active secret santa from chat_data...")
+    context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+
     text = f"Everyone has received their match in their <a href=\"{BOT_LINK}\">private chats</a>!"
     sent_message.edit_text(text)
-
-    if not config.santa.allow_revoke:
-        logger.debug("revoke ability is disabled: removing active secret santa from chat_data")
-        context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
 
     santa.start()
     update_secret_santa_message(context, santa)
