@@ -210,7 +210,7 @@ def persistence_object(file_path='persistence/data.pickle'):
         filename=file_path,
         store_chat_data=True,
         store_user_data=True,
-        store_bot_data=False
+        store_bot_data=True
     )
 
 
