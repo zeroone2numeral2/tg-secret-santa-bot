@@ -32,12 +32,14 @@ ACTIVE_SECRET_SANTA_KEY = "active_secret_santa"
 MUTED_KEY = "muted"
 BLOCKED_KEY = "blocked"
 RECENTLY_LEFT_KEY = "recently_left"
+RECENTLY_STARTED_SANTAS_KEY = "recently_closed_santas"
 
 EMPTY_SECRET_SANTA_STR = f'{Emoji.SANTA}{Emoji.TREE} Nobody joined this Secret Santa yet! Use the "<b>join</b>" button below to join'
 
 
 class Time:
     WEEK_4 = 60 * 60 * 24 * 7 * 4
+    WEEK_2 = 60 * 60 * 24 * 7 * 2
     WEEK_1 = 60 * 60 * 24 * 7
     DAY_3 = 60 * 60 * 24 * 3
     DAY_1 = 60 * 60 * 24
@@ -475,6 +477,17 @@ def on_leave_button_group(update: Update, context: CallbackContext, santa: Optio
     return santa
 
 
+def save_recently_started_santa(bot_data: dict, santa: SecretSanta):
+    chat_id = santa.chat_id
+
+    if RECENTLY_STARTED_SANTAS_KEY not in bot_data:
+        bot_data[RECENTLY_STARTED_SANTAS_KEY] = {}
+    if chat_id not in bot_data[RECENTLY_STARTED_SANTAS_KEY]:
+        bot_data[RECENTLY_STARTED_SANTAS_KEY][chat_id] = {}
+
+    bot_data[RECENTLY_STARTED_SANTAS_KEY][chat_id][santa.santa_message_id] = santa.dict()
+
+
 @fail_with_message(answer_to_message=False)
 @bot_restricted_check()
 @get_secret_santa()
@@ -542,8 +555,12 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         match_message = context.bot.send_message(receiver_id, text)
         santa.set_user_match_message_id(receiver_id, match_message.message_id)
 
-    logger.debug("removing active secret santa from chat_data...")
+    santa.start()  # doesn't do anything beside populating some datetimes
+
+    logger.debug("removing active secret santa from chat_data and saving a copy in bot_data...")
     context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
+
+    save_recently_started_santa(context.bot_data, santa)
 
     text = f"Everyone has received their match in their <a href=\"{BOT_LINK}\">private chats</a>!"
     sent_message.edit_text(text)
@@ -913,26 +930,55 @@ def close_old_secret_santas(context: CallbackContext):
 
 
 @fail_with_message_job
-def left_chats_cleanup(context: CallbackContext):
+def bot_data_cleanup(context: CallbackContext):
     logger.info("executing job...")
 
-    if RECENTLY_LEFT_KEY not in context.bot_data:
-        logger.info("...job execution end")
-        return
+    if RECENTLY_LEFT_KEY in context.bot_data:
+        logger.info("cleaning up %s...", RECENTLY_LEFT_KEY)
 
-    chat_ids_to_pop = []
-    for chat_id, left_dt in context.dispatcher.bot_data[RECENTLY_LEFT_KEY].items():
-        now = utilities.now()
-        diff_seconds = (now - left_dt).total_seconds()
-        if diff_seconds <= Time.WEEK_4:
-            continue
+        chat_ids_to_pop = []
+        for chat_id, left_dt in context.dispatcher.bot_data[RECENTLY_LEFT_KEY].items():
+            now = utilities.now()
+            diff_seconds = (now - left_dt).total_seconds()
+            if diff_seconds <= Time.WEEK_4:
+                continue
 
-        chat_ids_to_pop.append(chat_id)
+            chat_ids_to_pop.append(chat_id)
 
-    logger.debug("%d chats to pop", len(chat_ids_to_pop))
-    for chat_id in chat_ids_to_pop:
-        logger.debug("popping chat %d from recently left chats dict", chat_id)
-        context.dispatcher.bot_data[RECENTLY_LEFT_KEY].pop(chat_id, None)
+        logger.debug("%d chats to pop", len(chat_ids_to_pop))
+        for chat_id in chat_ids_to_pop:
+            logger.debug("popping chat %d from recently left chats dict", chat_id)
+            context.dispatcher.bot_data[RECENTLY_LEFT_KEY].pop(chat_id, None)
+
+    if RECENTLY_STARTED_SANTAS_KEY in context.bot_data:
+        logger.info("cleaning up %s...", RECENTLY_STARTED_SANTAS_KEY)
+
+        chat_ids_to_pop = []
+        logger.debug("currently stored chats: %d", len(context.bot_data[RECENTLY_STARTED_SANTAS_KEY]))
+        for chat_id, chat_santas in context.bot_data[RECENTLY_STARTED_SANTAS_KEY].items():
+            santa_ids_to_pop = []
+            for santa_message_id, santa_dict in chat_santas.items():
+                santa = SecretSanta.from_dict(santa_dict)
+                now = utilities.now()
+                diff_seconds = (now - santa.started_on).total_seconds()
+                if diff_seconds <= Time.WEEK_2:
+                    continue
+
+                santa_ids_to_pop.append(santa_message_id)
+
+            logger.debug("%d santa_ids to pop", len(santa_ids_to_pop))
+            for santa_id in santa_ids_to_pop:
+                logger.debug("popping santa_id %d from chat_id %d", santa_id, chat_id)
+                chat_santas.pop(santa_id, None)
+
+            if not chat_santas:
+                # the chat dict is now empty, we can remove it
+                chat_ids_to_pop.append(chat_id)
+
+        logger.debug("%d chat_ids to pop", len(chat_ids_to_pop))
+        for chat_id in chat_ids_to_pop:
+            logger.debug("popping chat_id %d because its dict is now empty", chat_id)
+            context.bot_data[RECENTLY_STARTED_SANTAS_KEY].pop(chat_id, None)
 
     logger.info("...job execution end")
 
@@ -963,8 +1009,8 @@ def main():
 
     dispatcher.add_handler(ChatMemberHandler(on_my_chat_member_update, ChatMemberHandler.MY_CHAT_MEMBER))
 
-    updater.job_queue.run_repeating(close_old_secret_santas, interval=Time.HOUR_1, first=Time.MINUTE_1)
-    updater.job_queue.run_repeating(left_chats_cleanup, interval=Time.DAY_1, first=Time.HOUR_6)
+    updater.job_queue.run_repeating(close_old_secret_santas, interval=Time.HOUR_6, first=Time.MINUTE_30)
+    updater.job_queue.run_repeating(bot_data_cleanup, interval=Time.DAY_1, first=Time.HOUR_6)
 
     updater.bot.set_my_commands([])  # make sure the bot doesn't have any command set...
     updater.bot.set_my_commands(  # ...then set the scope for private chats
