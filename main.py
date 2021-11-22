@@ -737,6 +737,51 @@ def on_leave_button_private(update: Update, context: CallbackContext, santa: Sec
 
 
 @fail_with_message(answer_to_message=False)
+def on_supergroup_migration(update: Update, context: CallbackContext):
+    # we receive two updates when a migration happens: one with migrate_from_chat_id, and one with migrate_to_chat_id
+    # we process only the one with migrate_to_chat_id, because effective_chat.id for this
+    # update is the old chat id, therefore its chat_data contains the populated chat data
+    if not update.message.migrate_to_chat_id:
+        return
+
+    logger.info(f"supergroup migration: {update.effective_chat.id} -> {update.message.migrate_to_chat_id}")
+
+    old_chat_id = update.effective_chat.id
+    new_chat_id = update.message.migrate_to_chat_id
+
+    if ACTIVE_SECRET_SANTA_KEY not in context.chat_data:
+        return
+
+    logger.debug("old chat_id %d has an ongoing secret santa", old_chat_id)
+
+    santa_dict = context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY)
+    old_santa = SecretSanta.from_dict(santa_dict)
+
+    # the api doesn't allow to delete the old santa message because the old group is no longer available
+
+    new_secret_santa = SecretSanta(
+        origin_message_id=update.effective_message.message_id,
+        user_id=old_santa.creator_id,
+        user_name=old_santa.creator_name,
+        chat_id=new_chat_id,
+        chat_title=update.effective_chat.title,
+        participants=old_santa.participants
+    )
+
+    logger.debug("sending new message...")
+    reply_markup = keyboards.secret_santa(new_chat_id, context.bot.username)
+    sent_message = context.bot.send_message(new_chat_id, EMPTY_SECRET_SANTA_STR, reply_markup=reply_markup)
+    new_secret_santa.santa_message_id = sent_message.message_id
+
+    logger.debug("saving new chat_data for new supergroup %d...", new_chat_id)
+    context.dispatcher.chat_data[new_chat_id] = {ACTIVE_SECRET_SANTA_KEY: new_secret_santa.dict()}
+
+    # we need to update it as soon as we send it because there might be existing participants to list
+    logger.debug("editing new message...")
+    update_secret_santa_message(context, new_secret_santa)
+
+
+@fail_with_message(answer_to_message=False)
 def on_new_group_chat(update: Update, context: CallbackContext):
     logger.info("new group chat: %d", update.effective_chat.id)
 
@@ -967,6 +1012,7 @@ def main():
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(MessageHandler(NewGroup(), on_new_group_chat))
+    dispatcher.add_handler(MessageHandler(Filters.status_update.migrate, on_supergroup_migration))
 
     dispatcher.add_handler(CommandHandler(["ongoing"], admin_ongoing_command, filters=Filters.chat_type.private))
 
