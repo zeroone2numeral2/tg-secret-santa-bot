@@ -957,7 +957,10 @@ def close_old_secret_santas(context: CallbackContext):
         if diff_seconds <= config.santa.timeout * Time.DAY_1:
             continue
 
-        secret_santa_expired(context, santa)
+        if MUTED_KEY in chat_data:
+            logger.info("can't edit chat %d's expired santa message: the bot is marked as muted", chat_id)
+        else:
+            secret_santa_expired(context, santa)
 
         logger.debug("popping secret santa from chat %d", chat_id)
         chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
