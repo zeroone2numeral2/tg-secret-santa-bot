@@ -920,7 +920,7 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
 
 def secret_santa_expired(context: CallbackContext, santa: SecretSanta):
     if not santa.started:
-        text = f"<i>This Secret Santa expired ({config.santa.timeout} hours has passed from its creation)</i>"
+        text = f"<i>This Secret Santa expired ({config.santa.timeout} days has passed from its creation)</i>"
     else:
         participants_list = gen_participants_list(santa.participants)
         text = '{hourglass} This Secret Santa has been closed. Participants list:\n\n{participants}'.format(
@@ -954,7 +954,7 @@ def close_old_secret_santas(context: CallbackContext):
 
         now = utilities.now()
         diff_seconds = (now - santa.created_on).total_seconds()
-        if diff_seconds <= config.santa.timeout * Time.HOUR_1:
+        if diff_seconds <= config.santa.timeout * Time.DAY_1:
             continue
 
         secret_santa_expired(context, santa)
