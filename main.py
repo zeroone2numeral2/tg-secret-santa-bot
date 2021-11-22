@@ -372,7 +372,7 @@ def create_new_secret_santa(update: Update, context: CallbackContext, santa: Opt
 @bot_restricted_check()
 @get_secret_santa()
 def on_new_secret_santa_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.info("/new from %d in chat %d", update.effective_user.id, update.effective_chat.id)
+    logger.info("/newsanta command: %d -> %d", update.effective_user.id, update.effective_chat.id)
 
     return create_new_secret_santa(update, context, santa)
 
@@ -381,7 +381,7 @@ def on_new_secret_santa_command(update: Update, context: CallbackContext, santa:
 @bot_restricted_check()
 @get_secret_santa()
 def on_new_secret_santa_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.info("new secret santa button from %d in chat %d", update.effective_user.id, update.effective_chat.id)
+    logger.info("new secret santa button: %d -> %d", update.effective_user.id, update.effective_chat.id)
 
     return create_new_secret_santa(update, context, santa)
 
@@ -419,6 +419,8 @@ def on_join_command(update: Update, context: CallbackContext):
 
     santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
     if not santa:
+        # this might happen if the bot was removed from the group: the "join" button is still there
+        # we should check if the chat is in the recently left chats in context.bot_data
         raise ValueError(f"user tried to join, but no secret santa is active in {santa_chat_id}")
 
     if config.santa.max_participants and santa.get_participants_count() >= config.santa.max_participants:
@@ -452,7 +454,7 @@ def on_join_command(update: Update, context: CallbackContext):
 @bot_restricted_check()
 @get_secret_santa()
 def on_leave_button_group(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("leave button in group: %d", update.effective_chat.id)
+    logger.debug("leave button in group: %d -> %d", update.effective_user.id, update.effective_chat.id)
 
     if not santa.is_participant(update.effective_user):
         update.callback_query.answer(f"{Emoji.FREEZE} You haven't joined this Secret Santa!", show_alert=True)
@@ -476,7 +478,7 @@ def on_leave_button_group(update: Update, context: CallbackContext, santa: Optio
 @bot_restricted_check()
 @get_secret_santa()
 def on_match_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("start match button: %d", update.effective_chat.id)
+    logger.debug("start match button: %d -> %d", update.effective_user.id, update.effective_chat.id)
     if santa.creator_id != update.effective_user.id:
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button and start the Secret Santa match",
@@ -532,7 +534,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
 @bot_restricted_check()
 @get_secret_santa()
 def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("cancel button: %d", update.effective_chat.id)
+    logger.debug("cancel button: %d -> %d", update.effective_user.id, update.effective_chat.id)
     if santa.creator_id != update.effective_user.id:
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button. Administrators can use /cancel "
@@ -552,7 +554,7 @@ def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[S
 @bot_restricted_check()
 @get_secret_santa()
 def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("revoke button: %d", update.effective_chat.id)
+    logger.debug("revoke button: %d -> %d", update.effective_user.id, update.effective_chat.id)
     if santa.creator_id != update.effective_user.id:
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button",
@@ -590,8 +592,8 @@ def on_revoke_button(update: Update, context: CallbackContext, santa: Optional[S
 
 @fail_with_message(answer_to_message=False)
 @bot_restricted_check()
-def on_hide_commands_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("/hidecommands command: %d", update.effective_chat.id)
+def on_hide_commands_command(update: Update, context: CallbackContext):
+    logger.debug("/hidecommands command: %d -> %d", update.effective_user.id, update.effective_chat.id)
 
     context.bot.set_my_commands(
         commands=[],
@@ -604,8 +606,8 @@ def on_hide_commands_command(update: Update, context: CallbackContext, santa: Op
 
 @fail_with_message(answer_to_message=False)
 @bot_restricted_check()
-def on_show_commands_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("/showcommands command: %d", update.effective_chat.id)
+def on_show_commands_command(update: Update, context: CallbackContext):
+    logger.debug("/showcommands command: %d -> %d", update.effective_user.id, update.effective_chat.id)
 
     context.bot.set_my_commands(
         commands=Commands.GROUP_ADMINISTRATORS,
@@ -618,7 +620,7 @@ def on_show_commands_command(update: Update, context: CallbackContext, santa: Op
 @bot_restricted_check()
 @get_secret_santa()
 def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
-    logger.debug("/cancel command: %d", update.effective_chat.id)
+    logger.debug("/cancel command: %d -> %d", update.effective_user.id, update.effective_chat.id)
 
     if not santa:
         update.message.reply_html("<i>There is no active Secret Santa</i>")
@@ -682,7 +684,7 @@ def private_chat_button():
 @fail_with_message(answer_to_message=True)
 @private_chat_button()
 def on_update_name_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
-    logger.debug("update name button in private: %d", update.effective_chat.id)
+    logger.debug("update name button in private: %d", update.effective_user.id)
 
     name = update.effective_user.first_name
     name_updated = False
@@ -702,7 +704,7 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
 @fail_with_message(answer_to_message=True)
 @private_chat_button()
 def on_leave_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
-    logger.debug("leave button in private: %d", update.effective_chat.id)
+    logger.debug("leave button in private: %d", update.effective_user.id)
 
     santa.remove(update.effective_user)
     update_secret_santa_message(context, santa)
