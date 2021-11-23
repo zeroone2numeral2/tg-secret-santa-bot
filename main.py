@@ -893,9 +893,13 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
         # status == ChatMember.LEFT -> bot was blocked
         # status == ChatMember.MEMBER-> bot was unblocked
         if my_chat_member.new_chat_member.status == ChatMember.LEFT:
+            logger.debug("bot was blocked by %d", my_chat_member.chat.id)
             context.user_data[BLOCKED_KEY] = True
         elif my_chat_member.new_chat_member.status == ChatMember.MEMBER:
+            logger.debug("bot was unblocked by %d", my_chat_member.chat.id)
             context.user_data.pop(BLOCKED_KEY, None)
+        else:
+            logger.debug("no relevant change happened (private chat): %s", my_chat_member)
 
         return
 
@@ -924,7 +928,7 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
         logger.debug("bot unmuted in %d", my_chat_member.chat.id)
         context.chat_data.pop(MUTED_KEY, None)
     else:
-        logger.debug("no relevant change happened: %s", my_chat_member)
+        logger.debug("no relevant change happened (group chat): %s", my_chat_member)
 
 
 def secret_santa_expired(context: CallbackContext, santa: SecretSanta):
