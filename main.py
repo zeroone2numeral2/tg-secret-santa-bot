@@ -421,10 +421,19 @@ def on_join_deeplink(update: Update, context: CallbackContext):
         # this might happen if the bot was removed from the group: the "join" button is still there
         # we should check if the chat is in the recently left chats in context.bot_data
         if RECENTLY_LEFT_KEY in context.bot_data and santa_chat_id in context.bot_data[RECENTLY_LEFT_KEY]:
+            logger.debug(f"no active santa in {santa_chat_id} and the chat appears among the recently left chats")
             update.message.reply_html(f"It looks like I've been removed from this Secret Santa's group {Emoji.SAD}")
-            return
         else:
-            raise ValueError(f"user tried to join, but no secret santa is active in {santa_chat_id}")
+            # raise ValueError(f"user tried to join, but no secret santa is active in {santa_chat_id}")
+
+            # it might happen that the bot is removed from the group, and then added again (so the chat_id
+            # doesn't appear in the recently left groups), and an user uses the old "join" button from an
+            # old secret santa
+
+            logger.debug(f"no active santa in {santa_chat_id}")
+            update.message.reply_html(f"It looks like there's no active Secret Santa in this group {Emoji.SAD} "
+                                      f"you probably used a \"<b>join</b>\" button from an old/inactive Secret Santa")
+        return
 
     if config.santa.max_participants and santa.get_participants_count() >= config.santa.max_participants:
         text = f"I'm sorry, unfortunately {santa.inline_link('this Secret Santa')} has already reached the " \
