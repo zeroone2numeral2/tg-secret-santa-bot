@@ -583,6 +583,14 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
 @get_secret_santa()
 def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.debug("cancel button: %d -> %d", update.effective_user.id, update.effective_chat.id)
+
+    if not santa:
+        # scenarios where this might happen: the bot is removed from the chat, then added back, and the
+        # user keeps using an old secret santa message's buttons
+        logger.warning("cancel button, but there is no active secret chanta in the chat")
+        update.callback_query.edit_message_text("<i>This Secret Santa is no longer active</i>", reply_markup=None)
+        return
+
     if santa.creator_id != update.effective_user.id:
         update.callback_query.answer(
             f"{Emoji.CROSS} Only {santa.creator_name} can use this button. Administrators can use /cancel "
