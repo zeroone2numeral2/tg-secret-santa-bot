@@ -892,8 +892,8 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
     if my_chat_member.chat.id > 0:
         # status == ChatMember.LEFT -> bot was blocked
         # status == ChatMember.MEMBER-> bot was unblocked
-        if my_chat_member.new_chat_member.status == ChatMember.LEFT:
-            logger.debug("bot was blocked by %d", my_chat_member.chat.id)
+        if my_chat_member.new_chat_member.status in (ChatMember.LEFT, ChatMember.KICKED):
+            logger.debug("bot was blocked by %d (new chat_member status: %s)", my_chat_member.chat.id, my_chat_member.new_chat_member.status)
             context.user_data[BLOCKED_KEY] = True
         elif my_chat_member.new_chat_member.status == ChatMember.MEMBER:
             logger.debug("bot was unblocked by %d", my_chat_member.chat.id)
