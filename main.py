@@ -908,7 +908,9 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
 
     if my_chat_member.new_chat_member.status == ChatMember.LEFT:
         # we receive this kind of update also when the group is deleted
-        logger.debug("bot removed from %d, removing chat_data...", my_chat_member.chat.id)
+        logger.debug("old_chat_member: %s", my_chat_member.old_chat_member)
+        logger.debug("new_chat_member: %s", my_chat_member.new_chat_member)
+        logger.info("bot removed from %d, removing chat_data...", my_chat_member.chat.id)
         context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
         context.chat_data.pop(MUTED_KEY, None)
         if RECENTLY_LEFT_KEY not in context.bot_data:
