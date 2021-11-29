@@ -57,6 +57,7 @@ class Error:
     REMOVED_FROM_GROUP = "bot was kicked from the"  # it might continue with "group chat" or "supergroup chat"
     CANT_EDIT = "chat_write_forbidden"  # we receive this when we try to edit a message/answer a callback query but we are muted
     MESSAGE_TO_EDIT_NOT_FOUND = "message to edit not found"
+    USER_BLOCKED_BOT = "bot was blocked by the user"
 
 
 class Commands:
@@ -515,6 +516,10 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         )
         return
 
+    # we answer to the callback query so the user doesn't (hopefully) keep on tapping on the button
+    # while the matches are generated
+    update.callback_query.answer(f'{Emoji.HOURGLASS} Generating matches...', cache_time=5)
+
     sent_message = update.effective_message.reply_html(f'{Emoji.HOURGLASS} <i>Matching users...</i>')
 
     blocked_by = []
@@ -522,7 +527,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
         try:
             context.bot.send_chat_action(user_id, ChatAction.TYPING)
         except (TelegramError, BadRequest) as e:
-            if "bot was blocked by the user" in str(e).lower():
+            if Error.USER_BLOCKED_BOT in str(e).lower():
                 logger.debug("%d blocked the bot", user_id)
             else:
                 # what to do?
