@@ -30,6 +30,7 @@ from config import config
 
 ACTIVE_SECRET_SANTA_KEY = "active_secret_santa"
 MUTED_KEY = "muted"
+REMOVED_KEY = "removed"
 BLOCKED_KEY = "blocked"
 RECENTLY_LEFT_KEY = "recently_left"
 RECENTLY_STARTED_SANTAS_KEY = "recently_closed_santas"
@@ -149,6 +150,10 @@ def bot_restricted_check():
         def wrapped(update: Update, context: CallbackContext, *args, **kwargs):
             if MUTED_KEY in context.chat_data:
                 logger.info("received an update from chat %d, but we are muted", update.effective_chat.id)
+                return
+
+            if REMOVED_KEY in context.chat_data:
+                logger.info("received an update from chat %d, but we have been removed", update.effective_chat.id)
                 return
 
             try:
@@ -809,6 +814,9 @@ def on_new_group_chat(update: Update, context: CallbackContext):
         update.effective_chat.leave()
         return
 
+    # always pop this key
+    context.chat_data.pop(REMOVED_KEY, None)
+
     if RECENTLY_LEFT_KEY in context.bot_data:
         logger.debug("removing group from recently left groups list...")
         context.bot_data[RECENTLY_LEFT_KEY].pop(update.effective_chat.id, None)
@@ -923,9 +931,15 @@ def on_my_chat_member_update(update: Update, context: CallbackContext):
         logger.info("bot removed from %d, removing chat_data...", my_chat_member.chat.id)
         context.chat_data.pop(ACTIVE_SECRET_SANTA_KEY, None)
         context.chat_data.pop(MUTED_KEY, None)
+
+        now = utilities.now()
+
+        # keep track that we have been removed from the chat
+        context.chat_data[REMOVED_KEY] = now
+
         if RECENTLY_LEFT_KEY not in context.bot_data:
             context.bot_data[RECENTLY_LEFT_KEY] = {}
-        context.bot_data[RECENTLY_LEFT_KEY][my_chat_member.chat.id] = utilities.now()
+        context.bot_data[RECENTLY_LEFT_KEY][my_chat_member.chat.id] = now
     elif was_muted(my_chat_member):
         logger.debug("bot muted in %d", my_chat_member.chat.id)
         context.chat_data[MUTED_KEY] = True
