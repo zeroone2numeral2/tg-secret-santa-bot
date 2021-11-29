@@ -526,7 +526,7 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
                 logger.debug("%d blocked the bot", user_id)
             else:
                 # what to do?
-                logger.debug("can't send chat action to %d: %s", user_id, str(e))
+                logger.warning("can't send chat action to %d: %s", user_id, str(e))
 
             blocked_by.append(utilities.mention_escaped_by_id(user_id, user_data["name"]))
 
