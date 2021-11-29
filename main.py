@@ -722,7 +722,7 @@ def private_chat_button():
 @fail_with_message(answer_to_message=True)
 @private_chat_button()
 def on_update_name_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
-    logger.debug("update name button in private: %d", update.effective_user.id)
+    logger.debug("update name button in private: %d (santa chat id: %d)", update.effective_user.id, santa.chat_id)
 
     name = update.effective_user.first_name
     name_updated = False
@@ -742,7 +742,7 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
 @fail_with_message(answer_to_message=True)
 @private_chat_button()
 def on_leave_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
-    logger.debug("leave button in private: %d", update.effective_user.id)
+    logger.debug("leave button in private: %d (santa chat id: %d)", update.effective_user.id, santa.chat_id)
 
     santa.remove(update.effective_user)
     update_secret_santa_message(context, santa)
