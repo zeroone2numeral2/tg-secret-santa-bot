@@ -830,7 +830,7 @@ def on_new_group_chat(update: Update, context: CallbackContext):
 
 @fail_with_message()
 def on_help(update: Update, _):
-    logger.info("/start or /help from: %s", update.effective_user.id)
+    logger.info("/start or /help from: %s (text: %s)", update.effective_user.id, update.message.text)
 
     source_code = "https://github.com/zeroone2numeral2/tg-secret-santa-bot"
     text = f"Hello {utilities.html_escape(update.effective_user.first_name)}!" \
