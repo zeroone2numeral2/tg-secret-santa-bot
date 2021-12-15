@@ -162,7 +162,7 @@ class SecretSanta:
         already_a_participant = user.id in self.participants
 
         self._santa_dict["participants"][user.id] = {
-            "name": user.first_name,
+            "name": user.first_name[:100],
             "match_message_id": match_message_id,
             "last_join_message_id": join_message_id
         }
