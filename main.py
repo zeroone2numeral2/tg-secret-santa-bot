@@ -25,6 +25,7 @@ import keyboards
 import utilities
 from emojis import Emoji
 from santa import SecretSanta
+from santa import NAME_MAX_LENGTH
 from mwt import MWT
 from config import config
 
@@ -734,7 +735,7 @@ def private_chat_button():
 def on_update_name_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("update name button in private: %d (santa chat id: %d)", update.effective_user.id, santa.chat_id)
 
-    name = update.effective_user.first_name
+    name = update.effective_user.first_name[:NAME_MAX_LENGTH]
     name_updated = False
 
     if name != santa.get_user_name(update.effective_user):
