@@ -77,7 +77,7 @@ updater = Updater(
         # https://github.com/python-telegram-bot/python-telegram-bot/blob/8531a7a40c322e3b06eb943325e819b37ee542e7/telegram/ext/updater.py#L267
         request=Request(con_pool_size=config.telegram.get('workers', 1) + 4)
     ),
-    workers=1,
+    workers=0,
     persistence=utilities.persistence_object()
 )
 
