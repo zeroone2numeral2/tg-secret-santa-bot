@@ -177,7 +177,7 @@ class SecretSanta:
         if isinstance(user, User):
             name = user.first_name
 
-        self._santa_dict["participants"][user.id]["name"] = name
+        self._santa_dict["participants"][user.id]["name"] = name[:NAME_MAX_LENGTH]
 
     # @update_time
     def remove(self, user: Union[int, User]) -> bool:
