@@ -755,6 +755,8 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
                 raise e
             logger.warning("update name button in private: secret santa message was not modified after usage")
 
+        return santa
+
 
 @fail_with_message(answer_to_message=True)
 @private_chat_button()
