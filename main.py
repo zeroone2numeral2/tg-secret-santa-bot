@@ -756,12 +756,12 @@ def on_leave_button_private(update: Update, context: CallbackContext, santa: Sec
     logger.debug("leave button in private: %d (santa chat id: %d)", update.effective_user.id, santa.chat_id)
 
     santa.remove(update.effective_user)
-    update_secret_santa_message(context, santa)
 
     text = f"{Emoji.FREEZE} You have been removed from {santa.chat_title_escaped}'s " \
            f"<a href=\"{santa.link()}\">Secret Santa</a>"
     update.callback_query.edit_message_text(text, reply_markup=None)
-    # update.callback_query.answer(f"You have been removed from this Secret Santa")
+
+    update_secret_santa_message(context, santa)
 
     return santa
 
