@@ -58,6 +58,7 @@ class Error:
     REMOVED_FROM_GROUP = "bot was kicked from the"  # it might continue with "group chat" or "supergroup chat"
     CANT_EDIT = "chat_write_forbidden"  # we receive this when we try to edit a message/answer a callback query but we are muted
     MESSAGE_TO_EDIT_NOT_FOUND = "message to edit not found"
+    MESSAGE_NOT_MODIFIED = "message is not modified"
     USER_BLOCKED_BOT = "bot was blocked by the user"
 
 
@@ -747,7 +748,12 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
                                  f"similar names)", show_alert=True)
 
     if name_updated:
-        update_secret_santa_message(context, santa)
+        try:
+            update_secret_santa_message(context, santa)
+        except (TelegramError, BadRequest) as e:
+            if Error.MESSAGE_NOT_MODIFIED not in e.message:
+                raise e
+            logger.warning("update name button in private: secret santa message was not modified after usage")
 
 
 @fail_with_message(answer_to_message=True)
@@ -761,7 +767,12 @@ def on_leave_button_private(update: Update, context: CallbackContext, santa: Sec
            f"<a href=\"{santa.link()}\">Secret Santa</a>"
     update.callback_query.edit_message_text(text, reply_markup=None)
 
-    update_secret_santa_message(context, santa)
+    try:
+        update_secret_santa_message(context, santa)
+    except (TelegramError, BadRequest) as e:
+        if Error.MESSAGE_NOT_MODIFIED not in e.message:
+            raise e
+        logger.warning("leave button in private: secret santa message was not modified after usage")
 
     return santa
 
