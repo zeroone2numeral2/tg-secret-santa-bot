@@ -114,95 +114,23 @@ def draft(items_list: list, max_invalid_picks: int = 300):
     # logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
     logger = logging.getLogger("draft")
 
-    items_list.sort()
+    random.shuffle(items_list)
 
-    result_pairs = []
-    yet_to_match = items_list[:]
-    invalid_picks_count = 0
+    items_count = len(items_list)
+    result_pairs = []  # [(santa, receiver), (santa, receiver)...]
+    for i, name in enumerate(items_list):
+        santa = i
+        receiver = i + 1
+        if receiver == items_count:
+            # the last santa gifts the first in the list
+            receiver = 0
 
-    for i, item in enumerate(items_list):
-        logger.debug(f"trying to match: {item}")
+        result_pairs.append((items_list[santa], items_list[receiver]))
 
-        picked_item = random.choice(yet_to_match)
-
-        if picked_item == item and len(yet_to_match) == 1:
-            # there is just one item left to match, but the only left item is the item itself
-            # the raffle should be invalidated and we should repeat it
-            raise StuckOnLastItem("the only item left to match is the item we are trying to match")
-        elif invalid_picks_count > max_invalid_picks:
-            # sometimes the bot ends in a loop, we need to figure out why
-            raise TooManyInvalidPicks(f"the number of invalid picks is higher than {max_invalid_picks}")
-
-        while item == picked_item:
-            logger.debug(f"invalid match {item} -> {picked_item}: item can't be matched with itself, trying again...")
-            invalid_picks_count += 1
-            picked_item = random.choice(yet_to_match)
-
-        yet_to_match.remove(picked_item)
-
-        result_pairs.append((item, picked_item))
-
-        yet_to_match_str = ', '.join([f"{i}" for i in yet_to_match])
-        logger.debug(f"valid match: {item} -> {picked_item}, yet to match: {yet_to_match_str}")
+    logger.debug("%s", items_list)
+    logger.debug("%s", result_pairs)
 
     return result_pairs
-
-
-def draft_old(items_list: list):
-    # logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
-    logger = logging.getLogger("draft")
-
-    items_list.sort()
-    number_of_items = len(items_list)
-
-    retry_raffle = True
-    while retry_raffle:
-        retry_raffle = False  # we will set it to true if there's an issue while creating pairs
-        
-        result_pairs = []
-        already_matched_to_someone = []
-        invalid_picks_count = 0
-        invalid_picks_threshold = 300
-
-        for i, item in enumerate(items_list):
-            logger.debug(f"trying to match: {item}")
-
-            picked_item = random.choice(items_list)
-            
-            if picked_item == item and i + 1 == number_of_items:
-                # there is just one item left to match, but the only left item is the item itself
-                # the raffle should be invalidated and we should repeat it
-                logger.warning("the only item left to match is the item we are trying to match")
-                retry_raffle = True
-                break
-            elif invalid_picks_count > invalid_picks_threshold:
-                # sometimes the bot ends in a loop, we need to figure this out
-                logger.warning(f"the number of invalid attempts is higher than {invalid_picks_threshold}")
-                retry_raffle = True
-                break
-
-            while item == picked_item or picked_item in already_matched_to_someone:
-                if item == picked_item:
-                    logger.debug(f"invalid match {item} -> {picked_item}: item can't be matched with itself, trying again...")
-                elif picked_item in already_matched_to_someone:
-                    logger.debug(f"invalid match {item} -> {picked_item}: item is already matched to someone else, trying again...")
-
-                invalid_picks_count += 1
-                picked_item = random.choice(items_list)
-
-            result_pairs.append((item, picked_item))
-
-            already_matched_to_someone.append(picked_item)
-
-            yet_to_match = list(set(items_list) - set(already_matched_to_someone))
-            yet_to_match_str = ', '.join([f"{i}" for i in sorted(yet_to_match)])
-            logger.debug(f"valid match: {item} -> {picked_item}, yet to match: {yet_to_match_str}")
-
-        if not retry_raffle:
-            logger.debug("draft concluded with success")
-            return result_pairs
-        else:
-            logger.warning("draft needs to be repeated!")
 
 
 def persistence_object(file_path='persistence/data.pickle'):
