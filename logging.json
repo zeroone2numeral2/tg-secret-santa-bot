@@ -34,6 +34,9 @@
         },
         "mwt": {
             "level": "WARNING"
+        },
+        "draft": {
+            "level": "INFO"
         }
     },
     "formatters": {
