@@ -468,7 +468,14 @@ def on_join_deeplink(update: Update, context: CallbackContext):
         update.message.reply_html(text)
         return
 
+    if santa.is_participant(update.effective_user):
+        # if already a participant, we remove the user first and then we check
+        # whether there's already participants with the same name
+        santa.remove(update.effective_user)
+
+    duplicate_name = santa.is_duplicate_name(update.effective_user.first_name)
     santa.add(update.effective_user)
+
     context.dispatcher.chat_data[santa_chat_id][ACTIVE_SECRET_SANTA_KEY] = santa.dict()
 
     if santa.creator_id == update.effective_user.id:
@@ -483,6 +490,12 @@ def on_join_deeplink(update: Update, context: CallbackContext):
         f"{wait_for_start_text}. You will receive your match here, in this chat",
         reply_markup=reply_markup
     )
+
+    if duplicate_name:
+        sent_message.reply_html(f"By the way, there's another participant named \"{utilities.html_escape(duplicate_name)}\" "
+                                f"in this Secret Santa. You can change your name from your "
+                                f"Telegram's settings and use the \"update your name\" button above to avoid "
+                                f"confusion {Emoji.SNOWMAN_2}", quote=True)
 
     santa.set_user_join_message_id(update.effective_user, sent_message.message_id)
 
