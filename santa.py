@@ -180,9 +180,9 @@ class SecretSanta:
         self._santa_dict["participants"][user.id]["name"] = name[:NAME_MAX_LENGTH]
 
     def is_duplicate_name(self, name):
-        name = name.lower()[:NAME_MAX_LENGTH]
+        name_lower = name.lower()[:NAME_MAX_LENGTH]
         for user_id, user_data in self.participants.items():
-            if user_data["name"].lower() == name:
+            if user_data["name"].lower() == name_lower:
                 return name[:NAME_MAX_LENGTH]  # we return the saved name (that is, shortened), for clarity
 
         return False
