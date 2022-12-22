@@ -401,7 +401,7 @@ def find_key(dispatcher_user_data: dict, target_chat_id: int, key_to_find: Union
         return key_to_find in chat_data
 
 
-def find_santa(dispatcher_chat_data: dict, santa_chat_id: int):
+def find_santa_by_chat_id(dispatcher_chat_data: dict, santa_chat_id: int):
     for chat_data_chat_id, chat_data in dispatcher_chat_data.items():
         if chat_data_chat_id != santa_chat_id:
             continue
@@ -424,7 +424,7 @@ def on_join_deeplink(update: Update, context: CallbackContext):
                                   f"new participants join until I can send messages there, I'm sorry {Emoji.SAD}")
         return
 
-    santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
+    santa = find_santa_by_chat_id(context.dispatcher.chat_data, santa_chat_id)
     if not santa:
         # this might happen if the bot was removed from the group: the "join" button is still there
         # we should check if the chat is in the recently left chats in context.bot_data
@@ -710,7 +710,7 @@ def private_chat_button():
             santa_chat_id = int(context.matches[0].group(1))
             logger.debug("private chat button, chat_id: %d", santa_chat_id)
 
-            santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
+            santa = find_santa_by_chat_id(context.dispatcher.chat_data, santa_chat_id)
             if not santa:
                 # if there is no santa in that chat (has already been started), the user will still be able to
                 # use these buttons, because we do not remove them when a secret santa is started
@@ -727,7 +727,12 @@ def private_chat_button():
                 update.callback_query.edit_message_reply_markup(reply_markup=None)
                 return
 
-            return func(update, context, santa, *args, **kwargs)
+            result = func(update, context, santa, *args, **kwargs)
+            if isinstance(result, SecretSanta):
+                # if a secret santa is returned, make sure to serialize it
+                context.chat_data[ACTIVE_SECRET_SANTA_KEY] = result.dict()
+
+            return result
 
         return wrapped
     return real_decorator
