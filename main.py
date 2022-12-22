@@ -618,7 +618,7 @@ def on_cancel_button(update: Update, context: CallbackContext, santa: Optional[S
     if not santa:
         # scenarios where this might happen: the bot is removed from the chat, then added back, and the
         # user keeps using an old secret santa message's buttons
-        logger.warning("cancel button, but there is no active secret chanta in the chat")
+        logger.warning("cancel button, but there is no active secret santa in the chat")
         update.callback_query.edit_message_text("<i>This Secret Santa is no longer active</i>", reply_markup=None)
         utilities.log_tg(context.bot, "cancel button used, but no active secret santa: check logs (especially whether "
                                       "we have been previously removed from the chat or not)!")
