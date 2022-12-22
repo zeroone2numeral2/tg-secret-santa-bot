@@ -224,13 +224,26 @@ def get_secret_santa():
         @wraps(func)
         def wrapped(update: Update, context: CallbackContext, *args, **kwargs):
 
-            if ACTIVE_SECRET_SANTA_KEY not in context.chat_data:
-                santa = None
+            santa = None
+            if update.effective_chat.id < 0:
+                logger.debug("searching for an active secret santa in %d's chat_data...", update.effective_chat.id)
+                if ACTIVE_SECRET_SANTA_KEY in context.chat_data:
+                    santa = SecretSanta.from_dict(context.chat_data[ACTIVE_SECRET_SANTA_KEY])
             else:
-                santa = SecretSanta.from_dict(context.chat_data[ACTIVE_SECRET_SANTA_KEY])
+                # private chat
+                if update.callback_query:
+                    # private chat's inline button
+                    santa_chat_id = int(context.matches[0].group(1))
+                else:
+                    # deeplink
+                    santa_chat_id = int(context.matches[0].group(1))
+
+                logger.debug("searching for an active secret santa for %d in the dispatcher...", santa_chat_id)
+                santa = find_santa_by_chat_id(context.dispatcher.chat_data, santa_chat_id)
 
             result_santa = func(update, context, santa, *args, **kwargs)
             if result_santa and isinstance(result_santa, SecretSanta):
+                logger.debug("saving returned SecretSanta object for chat %d...", result_santa.chat_id)
                 context.chat_data[ACTIVE_SECRET_SANTA_KEY] = result_santa.dict()
 
         return wrapped
@@ -704,13 +717,13 @@ def on_cancel_command(update: Update, context: CallbackContext, santa: Optional[
 
 
 def private_chat_button():
+    # MUST be placed after @get_secret_santa()
     def real_decorator(func):
         @wraps(func)
-        def wrapped(update: Update, context: CallbackContext, *args, **kwargs):
+        def wrapped(update: Update, context: CallbackContext, santa: Optional[SecretSanta], *args, **kwargs):
             santa_chat_id = int(context.matches[0].group(1))
             logger.debug("private chat button, chat_id: %d", santa_chat_id)
 
-            santa = find_santa_by_chat_id(context.dispatcher.chat_data, santa_chat_id)
             if not santa:
                 # if there is no santa in that chat (has already been started), the user will still be able to
                 # use these buttons, because we do not remove them when a secret santa is started
@@ -727,18 +740,14 @@ def private_chat_button():
                 update.callback_query.edit_message_reply_markup(reply_markup=None)
                 return
 
-            result = func(update, context, santa, *args, **kwargs)
-            if isinstance(result, SecretSanta):
-                # if a secret santa is returned, make sure to serialize it
-                context.chat_data[ACTIVE_SECRET_SANTA_KEY] = result.dict()
-
-            return result
+            return func(update, context, santa, *args, **kwargs)
 
         return wrapped
     return real_decorator
 
 
 @fail_with_message(answer_to_message=True)
+@get_secret_santa()
 @private_chat_button()
 def on_update_name_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("update name button in private: %d (santa chat id: %d)", update.effective_user.id, santa.chat_id)
@@ -766,6 +775,7 @@ def on_update_name_button_private(update: Update, context: CallbackContext, sant
 
 
 @fail_with_message(answer_to_message=True)
+@get_secret_santa()
 @private_chat_button()
 def on_leave_button_private(update: Update, context: CallbackContext, santa: SecretSanta):
     logger.debug("leave button in private: %d (santa chat id: %d)", update.effective_user.id, santa.chat_id)
