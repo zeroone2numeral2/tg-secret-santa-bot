@@ -394,6 +394,10 @@ def create_new_secret_santa(update: Update, context: CallbackContext, santa: Opt
 def on_new_secret_santa_command(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.info("/newsanta command: %d -> %d", update.effective_user.id, update.effective_chat.id)
 
+    if update.message and update.message.sender_chat:
+        update.message.reply_html(f"I'm sorry, anonymous users are not allowed to create a Secret Santa {Emoji.SAD}")
+        return
+
     return create_new_secret_santa(update, context, santa)
 
 
@@ -402,6 +406,8 @@ def on_new_secret_santa_command(update: Update, context: CallbackContext, santa:
 @get_secret_santa()
 def on_new_secret_santa_button(update: Update, context: CallbackContext, santa: Optional[SecretSanta] = None):
     logger.info("new secret santa button: %d -> %d", update.effective_user.id, update.effective_chat.id)
+
+    # callback query updates always come from real users, so no need to check for sender_chat
 
     return create_new_secret_santa(update, context, santa)
 
