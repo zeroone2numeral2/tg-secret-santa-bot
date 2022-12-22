@@ -712,7 +712,9 @@ def private_chat_button():
 
             santa = find_santa(context.dispatcher.chat_data, santa_chat_id)
             if not santa:
-                # we do not edit or delete this message when a Secrt Santa is started, so the buttons are still there
+                # if there is no santa in that chat (has already been started), the user will still be able to
+                # use these buttons, because we do not remove them when a secret santa is started
+                # we remove them just when they're used and there is no active secret santa
                 logger.debug("user tapped on a private chat button, but there is no active secret santa for that chat")
                 update.callback_query.answer(f"This chat's Secret Santa is no longer valid", show_alert=True)
                 update.callback_query.edit_message_reply_markup(reply_markup=None)
