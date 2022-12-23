@@ -599,14 +599,14 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
 
     logger.debug("gathered pairs matches, failed attempts: %d", failed_attempts)
 
-    for receiver_id, match_id in matches:
-        match_name = santa.get_user_name(match_id)
-        match_mention = utilities.mention_escaped_by_id(match_id, match_name)
+    for santa_id, present_receiver_id in matches:
+        present_receiver_name = santa.get_user_name(present_receiver_id)
+        present_receiver_mention = utilities.mention_escaped_by_id(present_receiver_id, present_receiver_name)
 
-        text = f"{Emoji.SANTA}{Emoji.PRESENT} You are {match_mention}'s <a href=\"{santa.link()}\">Secret Santa</a>!"
+        text = f"{Emoji.SANTA}{Emoji.PRESENT} You are {present_receiver_mention}'s <a href=\"{santa.link()}\">Secret Santa</a>!"
 
-        match_message = context.bot.send_message(receiver_id, text)
-        santa.set_user_match_message_id(receiver_id, match_message.message_id)
+        match_message = context.bot.send_message(santa_id, text)
+        santa.set_user_match_message_id(santa_id, match_message.message_id)
 
     santa.start()  # doesn't do anything beside populating some datetimes
 
@@ -618,7 +618,6 @@ def on_match_button(update: Update, context: CallbackContext, santa: Optional[Se
     text = f"Everyone has received their match in their <a href=\"{BOT_LINK}\">private chats</a>!"
     sent_message.edit_text(text)
 
-    santa.start()
     update_secret_santa_message(context, santa)
 
 
